@@ -1,0 +1,30 @@
+{
+  "name": "Agent Dev Environment",
+  "image": "mcr.microsoft.com/devcontainers/typescript-node:20-bookworm",
+
+  "features": {
+    "ghcr.io/devcontainers/features/git:1": {},
+    "ghcr.io/devcontainers/features/node:1": {
+      "version": "20"
+    },
+    "ghcr.io/devcontainers/features/common-utils:2": {}
+  },
+
+  "postCreateCommand": "npm install -g pnpm@latest && pnpm install",
+
+  "customizations": {
+    "vscode": {
+      "extensions": [
+        "ms-vscode.vscode-typescript-next",
+        "streetsidesoftware.code-spell-checker",
+        "dbaeumer.vscode-eslint",
+        "ritwickdey.liveserver",
+        "supabase.extension",
+        "github.copilot-chat",
+        "github.vscode-github-actions"
+      ]
+    }
+  },
+
+  "remoteUser": "vscode"
+}
