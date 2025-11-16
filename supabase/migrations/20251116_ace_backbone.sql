@@ -1,86 +1,87 @@
 -- ============================================================
 -- ACE Autonomous Content Engine
--- Month-One Data Backbone Migration
+-- Month-One Data Backbone Additions
+-- Compatible with existing Supabase schema
 -- ============================================================
 
--- ============================
--- 1. PRODUCTS
--- ============================
-
-create table if not exists products (
-  id uuid primary key default gen_random_uuid(),
-  name text not null,
-  description text,
-  niche text,
-  affiliate_link text,
-  created_at timestamptz default now()
-);
-
--- Ensure the niche column exists
-alter table products 
-  add column if not exists niche text;
-
--- Index for fast lookup by niche
-create index if not exists idx_products_niche on products(niche);
+-- NOTE:
+-- We are assuming these existing tables ALREADY exist:
+--   products
+--   agent_notes
+--   creative_patterns
+--   embeddings
+--   raw_videos
+--   trend_snapshots
+--
+-- This migration ONLY adds missing backbone tables and indexes.
+-- ============================================================
 
 
 -- ============================
--- 2. SCRIPTS
+-- 1. SCRIPTS
 -- ============================
 
 create table if not exists scripts (
-  id uuid primary key default gen_random_uuid(),
-  product_id uuid references products(id) on delete cascade,
+  script_id uuid primary key default gen_random_uuid(),
+  product_id uuid references products(product_id) on delete cascade,
   script_text text not null,
   hook text,
   creative_variables jsonb,
   created_at timestamptz default now()
 );
 
-create index if not exists idx_scripts_product_id on scripts(product_id);
+create index if not exists idx_scripts_product_id
+  on scripts(product_id);
 
 
 -- ============================
--- 3. VIDEO ASSETS
+-- 2. VIDEO ASSETS
 -- ============================
 
 create table if not exists video_assets (
-  id uuid primary key default gen_random_uuid(),
-  script_id uuid references scripts(id) on delete set null,
+  asset_id uuid primary key default gen_random_uuid(),
+  script_id uuid references scripts(script_id) on delete set null,
   storage_path text not null,
   thumbnail_path text,
   duration_seconds int,
   created_at timestamptz default now()
 );
 
-create index if not exists idx_video_assets_script_id on video_assets(script_id);
+create index if not exists idx_video_assets_script_id
+  on video_assets(script_id);
 
 
 -- ============================
--- 4. EXPERIMENTS
+-- 3. EXPERIMENTS
 -- ============================
 
 create table if not exists experiments (
-  id uuid primary key default gen_random_uuid(),
-  product_id uuid references products(id) on delete cascade,
-  script_id uuid references scripts(id) on delete set null,
-  asset_id uuid references video_assets(id) on delete set null,
+  experiment_id uuid primary key default gen_random_uuid(),
+  product_id uuid references products(product_id) on delete cascade,
+  script_id uuid references scripts(script_id) on delete set null,
+  asset_id uuid references video_assets(asset_id) on delete set null,
   hypothesis text,
   variation_label text,
   created_at timestamptz default now()
 );
 
-create index if not exists idx_experiments_product_id on experiments(product_id);
-create index if not exists idx_experiments_script_id on experiments(script_id);
+create index if not exists idx_experiments_product_id
+  on experiments(product_id);
+
+create index if not exists idx_experiments_script_id
+  on experiments(script_id);
+
+create index if not exists idx_experiments_created_at
+  on experiments(created_at);
 
 
 -- ============================
--- 5. PUBLISHED POSTS
+-- 4. PUBLISHED POSTS
 -- ============================
 
 create table if not exists published_posts (
-  id uuid primary key default gen_random_uuid(),
-  experiment_id uuid references experiments(id) on delete cascade,
+  post_id uuid primary key default gen_random_uuid(),
+  experiment_id uuid references experiments(experiment_id) on delete cascade,
   platform text not null,
   platform_post_id text,
   caption text,
@@ -89,17 +90,20 @@ create table if not exists published_posts (
   created_at timestamptz default now()
 );
 
-create index if not exists idx_published_posts_experiment_id 
+create index if not exists idx_published_posts_experiment_id
   on published_posts(experiment_id);
+
+create index if not exists idx_published_posts_platform
+  on published_posts(platform);
 
 
 -- ============================
--- 6. PERFORMANCE METRICS
+-- 5. PERFORMANCE METRICS
 -- ============================
 
 create table if not exists performance_metrics (
-  id uuid primary key default gen_random_uuid(),
-  post_id uuid references published_posts(id) on delete cascade,
+  metric_id uuid primary key default gen_random_uuid(),
+  post_id uuid references published_posts(post_id) on delete cascade,
   view_count bigint,
   like_count int,
   share_count int,
@@ -109,58 +113,52 @@ create table if not exists performance_metrics (
   collected_at timestamptz default now()
 );
 
-create index if not exists idx_performance_metrics_post_id 
+create index if not exists idx_performance_metrics_post_id
   on performance_metrics(post_id);
 
-
--- ============================
--- 7. AGENT NOTES
--- ============================
-
-create table if not exists agent_notes (
-  id uuid primary key default gen_random_uuid(),
-  agent_name text not null,
-  topic text,
-  content text not null,
-  importance int default 0,
-  created_at timestamptz default now()
-);
-
-create index if not exists idx_agent_notes_agent_name 
-  on agent_notes(agent_name);
+create index if not exists idx_performance_metrics_collected_at
+  on performance_metrics(collected_at);
 
 
 -- ============================
--- 8. TREND SNAPSHOTS
--- ============================
-
-create table if not exists trend_snapshots (
-  id uuid primary key default gen_random_uuid(),
-  platform text not null,
-  raw_data jsonb not null,
-  collected_at timestamptz default now()
-);
-
-create index if not exists idx_trend_snapshots_platform 
-  on trend_snapshots(platform);
-
-
--- ============================
--- 9. SYSTEM EVENTS
+-- 6. SYSTEM EVENTS
 -- ============================
 
 create table if not exists system_events (
-  id uuid primary key default gen_random_uuid(),
+  event_id uuid primary key default gen_random_uuid(),
   agent_name text,
   event_type text not null,
   payload jsonb,
   created_at timestamptz default now()
 );
 
-create index if not exists idx_system_events_agent_name 
+create index if not exists idx_system_events_agent_name
   on system_events(agent_name);
-create index if not exists idx_system_events_event_type 
+
+create index if not exists idx_system_events_event_type
   on system_events(event_type);
+
+create index if not exists idx_system_events_created_at
+  on system_events(created_at);
+
+
+-- ============================
+-- 7. OPTIONAL INDEXES ON EXISTING TABLES
+-- ============================
+-- These are safe and purely performance-oriented. If they already
+-- exist, the "if not exists" will no-op.
+
+-- creative_patterns.product_id
+create index if not exists idx_creative_patterns_product_id
+  on creative_patterns(product_id);
+
+-- trend_snapshots.product_id
+create index if not exists idx_trend_snapshots_product_id
+  on trend_snapshots(product_id);
+
+-- raw_videos.platform + external_id
+create index if not exists idx_raw_videos_platform_external
+  on raw_videos(platform, external_id);
 
 -- ============================================================
 -- END OF MIGRATION
