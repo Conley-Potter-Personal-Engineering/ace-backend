@@ -1,7 +1,7 @@
 const loadEnv = async () => {
   try {
     const dotenv = await import("dotenv");
-    dotenv.config();
+    dotenv.config({ path: "./config/.env.local" });
   } catch {
     // dotenv is optional; environments like CI should provide variables explicitly.
   }
