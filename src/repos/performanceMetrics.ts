@@ -1,4 +1,4 @@
-import { supabase } from "../db/db";
+import { getSupabase } from "../db/db";
 import type { Tables, TablesInsert, TablesUpdate } from "../db/types";
 import { identifierSchema, nullableDateSchema, z } from "./validators";
 
@@ -22,7 +22,7 @@ export const logPerformanceMetric = async (
   payload: TablesInsert<"performance_metrics">,
 ) => {
   const validated = performanceMetricInsertSchema.parse(payload);
-  const { data, error } = await supabase
+  const { data, error } = await getSupabase()
     .from("performance_metrics")
     .insert(validated)
     .select("*")
@@ -37,7 +37,7 @@ export const logPerformanceMetric = async (
 };
 
 export const listPerformanceMetrics = async () => {
-  const { data, error } = await supabase
+  const { data, error } = await getSupabase()
     .from("performance_metrics")
     .select("*")
     .order("collected_at", { ascending: false })
@@ -52,7 +52,7 @@ export const listPerformanceMetrics = async () => {
 
 export const getPerformanceMetricById = async (metricId: string) => {
   const validatedId = metricIdSchema.parse(metricId);
-  const { data, error } = await supabase
+  const { data, error } = await getSupabase()
     .from("performance_metrics")
     .select("*")
     .eq("metric_id", validatedId)
@@ -74,7 +74,7 @@ export const updatePerformanceMetric = async (
 ) => {
   const validatedId = metricIdSchema.parse(metricId);
   const validatedChanges = performanceMetricUpdateSchema.parse(changes);
-  const { data, error } = await supabase
+  const { data, error } = await getSupabase()
     .from("performance_metrics")
     .update(validatedChanges)
     .eq("metric_id", validatedId)
@@ -93,7 +93,7 @@ export const updatePerformanceMetric = async (
 
 export const deletePerformanceMetric = async (metricId: string) => {
   const validatedId = metricIdSchema.parse(metricId);
-  const { data, error } = await supabase
+  const { data, error } = await getSupabase()
     .from("performance_metrics")
     .delete()
     .eq("metric_id", validatedId)
@@ -112,7 +112,7 @@ export const deletePerformanceMetric = async (metricId: string) => {
 
 export const listMetricsForPost = async (postId: string) => {
   const validatedPostId = identifierSchema.parse(postId);
-  const { data, error } = await supabase
+  const { data, error } = await getSupabase()
     .from("performance_metrics")
     .select("*")
     .eq("post_id", validatedPostId)
@@ -130,7 +130,7 @@ export const listMetricsForPost = async (postId: string) => {
 
 export const getLatestMetricsForPost = async (postId: string) => {
   const validatedPostId = identifierSchema.parse(postId);
-  const { data, error } = await supabase
+  const { data, error } = await getSupabase()
     .from("performance_metrics")
     .select("*")
     .eq("post_id", validatedPostId)

@@ -1,4 +1,4 @@
-import { supabase } from "../db/db";
+import { getSupabase } from "../db/db";
 import type { Tables, TablesInsert, TablesUpdate } from "../db/types";
 import { identifierSchema, nullableDateSchema, z } from "./validators";
 
@@ -19,7 +19,7 @@ export const createVideoAsset = async (
   payload: TablesInsert<"video_assets">,
 ) => {
   const validated = videoAssetInsertSchema.parse(payload);
-  const { data, error } = await supabase
+  const { data, error } = await getSupabase()
     .from("video_assets")
     .insert(validated)
     .select("*")
@@ -34,7 +34,7 @@ export const createVideoAsset = async (
 };
 
 export const listVideoAssets = async () => {
-  const { data, error } = await supabase
+  const { data, error } = await getSupabase()
     .from("video_assets")
     .select("*")
     .order("created_at", { ascending: false })
@@ -49,7 +49,7 @@ export const listVideoAssets = async () => {
 
 export const getVideoAssetById = async (assetId: string) => {
   const validatedId = assetIdSchema.parse(assetId);
-  const { data, error } = await supabase
+  const { data, error } = await getSupabase()
     .from("video_assets")
     .select("*")
     .eq("asset_id", validatedId)
@@ -71,7 +71,7 @@ export const updateVideoAsset = async (
 ) => {
   const validatedId = assetIdSchema.parse(assetId);
   const validatedChanges = videoAssetUpdateSchema.parse(changes);
-  const { data, error } = await supabase
+  const { data, error } = await getSupabase()
     .from("video_assets")
     .update(validatedChanges)
     .eq("asset_id", validatedId)
@@ -90,7 +90,7 @@ export const updateVideoAsset = async (
 
 export const deleteVideoAsset = async (assetId: string) => {
   const validatedId = assetIdSchema.parse(assetId);
-  const { data, error } = await supabase
+  const { data, error } = await getSupabase()
     .from("video_assets")
     .delete()
     .eq("asset_id", validatedId)
@@ -109,7 +109,7 @@ export const deleteVideoAsset = async (assetId: string) => {
 
 export const listAssetsForScript = async (scriptId: string) => {
   const validatedScriptId = identifierSchema.parse(scriptId);
-  const { data, error } = await supabase
+  const { data, error } = await getSupabase()
     .from("video_assets")
     .select("*")
     .eq("script_id", validatedScriptId)
@@ -126,7 +126,7 @@ export const listAssetsForScript = async (scriptId: string) => {
 };
 
 export const listAssetsMissingThumbnails = async () => {
-  const { data, error } = await supabase
+  const { data, error } = await getSupabase()
     .from("video_assets")
     .select("*")
     .is("thumbnail_path", null)

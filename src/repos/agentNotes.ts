@@ -1,4 +1,4 @@
-import { supabase } from "../db/db";
+import { getSupabase } from "../db/db";
 import type { Tables, TablesInsert, TablesUpdate } from "../db/types";
 import { identifierSchema, nullableDateSchema, z } from "./validators";
 
@@ -18,7 +18,7 @@ const noteIdSchema = identifierSchema.describe("note_id");
 
 export const createAgentNote = async (payload: TablesInsert<"agent_notes">) => {
   const validated = agentNoteInsertSchema.parse(payload);
-  const { data, error } = await supabase
+  const { data, error } = await getSupabase()
     .from("agent_notes")
     .insert(validated)
     .select("*")
@@ -33,7 +33,7 @@ export const createAgentNote = async (payload: TablesInsert<"agent_notes">) => {
 };
 
 export const listAgentNotes = async () => {
-  const { data, error } = await supabase
+  const { data, error } = await getSupabase()
     .from("agent_notes")
     .select("*")
     .order("created_at", { ascending: false })
@@ -48,7 +48,7 @@ export const listAgentNotes = async () => {
 
 export const getAgentNoteById = async (noteId: string) => {
   const validatedId = noteIdSchema.parse(noteId);
-  const { data, error } = await supabase
+  const { data, error } = await getSupabase()
     .from("agent_notes")
     .select("*")
     .eq("note_id", validatedId)
@@ -70,7 +70,7 @@ export const updateAgentNote = async (
 ) => {
   const validatedId = noteIdSchema.parse(noteId);
   const validatedChanges = agentNoteUpdateSchema.parse(changes);
-  const { data, error } = await supabase
+  const { data, error } = await getSupabase()
     .from("agent_notes")
     .update(validatedChanges)
     .eq("note_id", validatedId)
@@ -89,7 +89,7 @@ export const updateAgentNote = async (
 
 export const deleteAgentNote = async (noteId: string) => {
   const validatedId = noteIdSchema.parse(noteId);
-  const { data, error } = await supabase
+  const { data, error } = await getSupabase()
     .from("agent_notes")
     .delete()
     .eq("note_id", validatedId)
@@ -108,7 +108,7 @@ export const deleteAgentNote = async (noteId: string) => {
 
 export const listNotesForAgent = async (agentName: string) => {
   const validatedAgentName = identifierSchema.parse(agentName);
-  const { data, error } = await supabase
+  const { data, error } = await getSupabase()
     .from("agent_notes")
     .select("*")
     .eq("agent_name", validatedAgentName)
@@ -126,7 +126,7 @@ export const listNotesForAgent = async (agentName: string) => {
 
 export const searchNotesByTopic = async (topicFragment: string) => {
   const validatedFragment = identifierSchema.parse(topicFragment);
-  const { data, error } = await supabase
+  const { data, error } = await getSupabase()
     .from("agent_notes")
     .select("*")
     .ilike("topic", `%${validatedFragment}%`)
@@ -143,7 +143,7 @@ export const searchNotesByTopic = async (topicFragment: string) => {
 
 export const listImportantNotes = async (minimumImportance = 0.8) => {
   const validatedThreshold = z.number().min(0).max(1).parse(minimumImportance);
-  const { data, error } = await supabase
+  const { data, error } = await getSupabase()
     .from("agent_notes")
     .select("*")
     .gte("importance", validatedThreshold)

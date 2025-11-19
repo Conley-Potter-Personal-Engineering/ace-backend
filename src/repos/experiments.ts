@@ -1,4 +1,4 @@
-import { supabase } from "../db/db";
+import { getSupabase } from "../db/db";
 import type { Tables, TablesInsert, TablesUpdate } from "../db/types";
 import { identifierSchema, nullableDateSchema, z } from "./validators";
 
@@ -20,7 +20,7 @@ export const createExperiment = async (
   payload: TablesInsert<"experiments">,
 ) => {
   const validated = experimentInsertSchema.parse(payload);
-  const { data, error } = await supabase
+  const { data, error } = await getSupabase()
     .from("experiments")
     .insert(validated)
     .select("*")
@@ -35,7 +35,7 @@ export const createExperiment = async (
 };
 
 export const listExperiments = async () => {
-  const { data, error } = await supabase
+  const { data, error } = await getSupabase()
     .from("experiments")
     .select("*")
     .order("created_at", { ascending: false })
@@ -50,7 +50,7 @@ export const listExperiments = async () => {
 
 export const getExperimentById = async (experimentId: string) => {
   const validatedId = experimentIdSchema.parse(experimentId);
-  const { data, error } = await supabase
+  const { data, error } = await getSupabase()
     .from("experiments")
     .select("*")
     .eq("experiment_id", validatedId)
@@ -72,7 +72,7 @@ export const updateExperiment = async (
 ) => {
   const validatedId = experimentIdSchema.parse(experimentId);
   const validatedChanges = experimentUpdateSchema.parse(changes);
-  const { data, error } = await supabase
+  const { data, error } = await getSupabase()
     .from("experiments")
     .update(validatedChanges)
     .eq("experiment_id", validatedId)
@@ -91,7 +91,7 @@ export const updateExperiment = async (
 
 export const deleteExperiment = async (experimentId: string) => {
   const validatedId = experimentIdSchema.parse(experimentId);
-  const { data, error } = await supabase
+  const { data, error } = await getSupabase()
     .from("experiments")
     .delete()
     .eq("experiment_id", validatedId)
@@ -110,7 +110,7 @@ export const deleteExperiment = async (experimentId: string) => {
 
 export const listExperimentsForProduct = async (productId: string) => {
   const validatedProductId = identifierSchema.parse(productId);
-  const { data, error } = await supabase
+  const { data, error } = await getSupabase()
     .from("experiments")
     .select("*")
     .eq("product_id", validatedProductId)
@@ -128,7 +128,7 @@ export const listExperimentsForProduct = async (productId: string) => {
 
 export const listExperimentsForScript = async (scriptId: string) => {
   const validatedScriptId = identifierSchema.parse(scriptId);
-  const { data, error } = await supabase
+  const { data, error } = await getSupabase()
     .from("experiments")
     .select("*")
     .eq("script_id", validatedScriptId)
@@ -145,7 +145,7 @@ export const listExperimentsForScript = async (scriptId: string) => {
 
 export const listExperimentsForAsset = async (assetId: string) => {
   const validatedAssetId = identifierSchema.parse(assetId);
-  const { data, error } = await supabase
+  const { data, error } = await getSupabase()
     .from("experiments")
     .select("*")
     .eq("asset_id", validatedAssetId)

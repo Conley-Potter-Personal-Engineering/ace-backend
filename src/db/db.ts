@@ -56,3 +56,5 @@ export const aceDb = {
 
 export type AceDb = typeof aceDb;
 
+export { getSupabase };
+

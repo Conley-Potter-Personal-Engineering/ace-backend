@@ -1,4 +1,4 @@
-import { supabase } from "../db/db";
+import { getSupabase } from "../db/db";
 import type { Tables, TablesInsert, TablesUpdate } from "../db/types";
 import {
   identifierSchema,
@@ -26,7 +26,7 @@ export const createPublishedPost = async (
   payload: TablesInsert<"published_posts">,
 ) => {
   const validated = publishedPostInsertSchema.parse(payload);
-  const { data, error } = await supabase
+  const { data, error } = await getSupabase()
     .from("published_posts")
     .insert(validated)
     .select("*")
@@ -41,7 +41,7 @@ export const createPublishedPost = async (
 };
 
 export const listPublishedPosts = async () => {
-  const { data, error } = await supabase
+  const { data, error } = await getSupabase()
     .from("published_posts")
     .select("*")
     .order("posted_at", { ascending: false })
@@ -56,7 +56,7 @@ export const listPublishedPosts = async () => {
 
 export const getPublishedPostById = async (postId: string) => {
   const validatedId = postIdSchema.parse(postId);
-  const { data, error } = await supabase
+  const { data, error } = await getSupabase()
     .from("published_posts")
     .select("*")
     .eq("post_id", validatedId)
@@ -78,7 +78,7 @@ export const updatePublishedPost = async (
 ) => {
   const validatedId = postIdSchema.parse(postId);
   const validatedChanges = publishedPostUpdateSchema.parse(changes);
-  const { data, error } = await supabase
+  const { data, error } = await getSupabase()
     .from("published_posts")
     .update(validatedChanges)
     .eq("post_id", validatedId)
@@ -97,7 +97,7 @@ export const updatePublishedPost = async (
 
 export const deletePublishedPost = async (postId: string) => {
   const validatedId = postIdSchema.parse(postId);
-  const { data, error } = await supabase
+  const { data, error } = await getSupabase()
     .from("published_posts")
     .delete()
     .eq("post_id", validatedId)
@@ -116,7 +116,7 @@ export const deletePublishedPost = async (postId: string) => {
 
 export const listPostsForExperiment = async (experimentId: string) => {
   const validatedExperimentId = identifierSchema.parse(experimentId);
-  const { data, error } = await supabase
+  const { data, error } = await getSupabase()
     .from("published_posts")
     .select("*")
     .eq("experiment_id", validatedExperimentId)
@@ -134,7 +134,7 @@ export const listPostsForExperiment = async (experimentId: string) => {
 
 export const listPostsForPlatform = async (platform: string) => {
   const validatedPlatform = identifierSchema.parse(platform);
-  const { data, error } = await supabase
+  const { data, error } = await getSupabase()
     .from("published_posts")
     .select("*")
     .eq("platform", validatedPlatform)
@@ -152,7 +152,7 @@ export const listPostsForPlatform = async (platform: string) => {
 
 export const listRecentPublishedPosts = async (limit = 10) => {
   const validatedLimit = z.number().int().positive().parse(limit);
-  const { data, error } = await supabase
+  const { data, error } = await getSupabase()
     .from("published_posts")
     .select("*")
     .order("posted_at", { ascending: false })

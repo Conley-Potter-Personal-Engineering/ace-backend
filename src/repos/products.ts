@@ -1,4 +1,4 @@
-import { supabase } from "../db/db";
+import { getSupabase } from "../db/db";
 import type { Tables, TablesInsert, TablesUpdate } from "../db/types";
 import {
   identifierSchema,
@@ -26,7 +26,7 @@ const productIdSchema = identifierSchema.describe("product_id");
 
 export const createProduct = async (payload: TablesInsert<"products">) => {
   const validated = productInsertSchema.parse(payload);
-  const { data, error } = await supabase
+  const { data, error } = await getSupabase()
     .from("products")
     .insert(validated)
     .select("*")
@@ -41,7 +41,7 @@ export const createProduct = async (payload: TablesInsert<"products">) => {
 };
 
 export const listProducts = async () => {
-  const { data, error } = await supabase
+  const { data, error } = await getSupabase()
     .from("products")
     .select("*")
     .order("created_at", { ascending: false })
@@ -56,7 +56,7 @@ export const listProducts = async () => {
 
 export const getProductById = async (productId: string) => {
   const validatedId = productIdSchema.parse(productId);
-  const { data, error } = await supabase
+  const { data, error } = await getSupabase()
     .from("products")
     .select("*")
     .eq("product_id", validatedId)
@@ -78,7 +78,7 @@ export const updateProduct = async (
 ) => {
   const validatedId = productIdSchema.parse(productId);
   const validatedChanges = productUpdateSchema.parse(changes);
-  const { data, error } = await supabase
+  const { data, error } = await getSupabase()
     .from("products")
     .update(validatedChanges)
     .eq("product_id", validatedId)
@@ -97,7 +97,7 @@ export const updateProduct = async (
 
 export const deleteProduct = async (productId: string) => {
   const validatedId = productIdSchema.parse(productId);
-  const { data, error } = await supabase
+  const { data, error } = await getSupabase()
     .from("products")
     .delete()
     .eq("product_id", validatedId)
@@ -116,7 +116,7 @@ export const deleteProduct = async (productId: string) => {
 
 export const listProductsByCategory = async (category: string) => {
   const validatedCategory = identifierSchema.parse(category);
-  const { data, error } = await supabase
+  const { data, error } = await getSupabase()
     .from("products")
     .select("*")
     .eq("category", validatedCategory)
@@ -133,7 +133,7 @@ export const listProductsByCategory = async (category: string) => {
 
 export const listProductsForPlatform = async (platform: string) => {
   const validatedPlatform = identifierSchema.parse(platform);
-  const { data, error } = await supabase
+  const { data, error } = await getSupabase()
     .from("products")
     .select("*")
     .eq("source_platform", validatedPlatform)
@@ -150,7 +150,7 @@ export const listProductsForPlatform = async (platform: string) => {
 
 export const searchProductsByName = async (searchTerm: string) => {
   const validatedTerm = identifierSchema.parse(searchTerm);
-  const { data, error } = await supabase
+  const { data, error } = await getSupabase()
     .from("products")
     .select("*")
     .ilike("name", `%${validatedTerm}%`)

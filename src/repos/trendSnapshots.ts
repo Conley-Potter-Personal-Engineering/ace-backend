@@ -1,4 +1,4 @@
-import { supabase } from "../db/db";
+import { getSupabase } from "../db/db";
 import type { Tables, TablesInsert, TablesUpdate } from "../db/types";
 import {
   identifierSchema,
@@ -27,7 +27,7 @@ export const createTrendSnapshot = async (
   payload: TablesInsert<"trend_snapshots">,
 ) => {
   const validated = trendSnapshotInsertSchema.parse(payload);
-  const { data, error } = await supabase
+  const { data, error } = await getSupabase()
     .from("trend_snapshots")
     .insert(validated)
     .select("*")
@@ -42,7 +42,7 @@ export const createTrendSnapshot = async (
 };
 
 export const listTrendSnapshots = async () => {
-  const { data, error } = await supabase
+  const { data, error } = await getSupabase()
     .from("trend_snapshots")
     .select("*")
     .order("snapshot_time", { ascending: false })
@@ -57,7 +57,7 @@ export const listTrendSnapshots = async () => {
 
 export const getTrendSnapshotById = async (snapshotId: string) => {
   const validatedId = snapshotIdSchema.parse(snapshotId);
-  const { data, error } = await supabase
+  const { data, error } = await getSupabase()
     .from("trend_snapshots")
     .select("*")
     .eq("snapshot_id", validatedId)
@@ -79,7 +79,7 @@ export const updateTrendSnapshot = async (
 ) => {
   const validatedId = snapshotIdSchema.parse(snapshotId);
   const validatedChanges = trendSnapshotUpdateSchema.parse(changes);
-  const { data, error } = await supabase
+  const { data, error } = await getSupabase()
     .from("trend_snapshots")
     .update(validatedChanges)
     .eq("snapshot_id", validatedId)
@@ -98,7 +98,7 @@ export const updateTrendSnapshot = async (
 
 export const deleteTrendSnapshot = async (snapshotId: string) => {
   const validatedId = snapshotIdSchema.parse(snapshotId);
-  const { data, error } = await supabase
+  const { data, error } = await getSupabase()
     .from("trend_snapshots")
     .delete()
     .eq("snapshot_id", validatedId)
@@ -117,7 +117,7 @@ export const deleteTrendSnapshot = async (snapshotId: string) => {
 
 export const listSnapshotsForProduct = async (productId: string) => {
   const validatedProductId = identifierSchema.parse(productId);
-  const { data, error } = await supabase
+  const { data, error } = await getSupabase()
     .from("trend_snapshots")
     .select("*")
     .eq("product_id", validatedProductId)
@@ -135,7 +135,7 @@ export const listSnapshotsForProduct = async (productId: string) => {
 
 export const getLatestSnapshotForProduct = async (productId: string) => {
   const validatedProductId = identifierSchema.parse(productId);
-  const { data, error } = await supabase
+  const { data, error } = await getSupabase()
     .from("trend_snapshots")
     .select("*")
     .eq("product_id", validatedProductId)
@@ -154,7 +154,7 @@ export const getLatestSnapshotForProduct = async (productId: string) => {
 
 export const listHighVelocitySnapshots = async (minimumVelocity = 0.7) => {
   const validatedThreshold = z.number().min(0).parse(minimumVelocity);
-  const { data, error } = await supabase
+  const { data, error } = await getSupabase()
     .from("trend_snapshots")
     .select("*")
     .gte("velocity_score", validatedThreshold)

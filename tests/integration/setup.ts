@@ -1,7 +1,13 @@
 const loadEnv = async () => {
   try {
     const dotenv = await import("dotenv");
-    dotenv.config({ path: "./config/.env.local" });
+    // Prioritize .env.test for integration tests
+    const fs = await import("fs");
+    if (fs.existsSync("./config/.env.test")) {
+      dotenv.config({ path: "./config/.env.test" });
+    } else {
+      dotenv.config({ path: "./config/.env.local" });
+    }
   } catch {
     // dotenv is optional; environments like CI should provide variables explicitly.
   }

@@ -16,7 +16,9 @@ vi.mock("../../../src/db/db", () => {
   return { getSupabase, __singleResponse: singleResponse };
 });
 
-const { getSupabase, __singleResponse } = await import("../../../src/db/db");
+const { getSupabase, __singleResponse } = (await import(
+  "../../../src/db/db"
+)) as any;
 
 describe("scriptsRepo.createScript", () => {
   beforeEach(() => {
@@ -25,16 +27,21 @@ describe("scriptsRepo.createScript", () => {
   });
 
   it("persists a script and returns the created row", async () => {
-    const script = buildScript();
+    const script = buildScript({
+      script_text: "test script",
+      hook: "test hook",
+      creative_variables: { emotion: "joy", structure: "list", style: "fast" },
+      created_at: new Date().toISOString(),
+    });
     Object.assign(__singleResponse, { data: script });
 
     const result = await createScript({
       scriptId: script.script_id,
-      productId: script.product_id,
+      productId: script.product_id!,
       scriptText: script.script_text,
-      hook: script.hook,
-      creativeVariables: script.creative_variables,
-      createdAt: script.created_at,
+      hook: script.hook!,
+      creativeVariables: script.creative_variables as any,
+      createdAt: script.created_at!,
     });
 
     expect(getSupabase().from).toHaveBeenCalledWith("scripts");

@@ -1,4 +1,4 @@
-import { supabase } from "../db/db";
+import { getSupabase } from "../db/db";
 import type { Tables, TablesInsert, TablesUpdate } from "../db/types";
 import {
   identifierSchema,
@@ -28,7 +28,7 @@ const rawVideoIdSchema = identifierSchema.describe("id");
 
 export const createRawVideo = async (payload: TablesInsert<"raw_videos">) => {
   const validated = rawVideoInsertSchema.parse(payload);
-  const { data, error } = await supabase
+  const { data, error } = await getSupabase()
     .from("raw_videos")
     .insert(validated)
     .select("*")
@@ -43,7 +43,7 @@ export const createRawVideo = async (payload: TablesInsert<"raw_videos">) => {
 };
 
 export const listRawVideos = async () => {
-  const { data, error } = await supabase
+  const { data, error } = await getSupabase()
     .from("raw_videos")
     .select("*")
     .order("collected_at", { ascending: false })
@@ -58,7 +58,7 @@ export const listRawVideos = async () => {
 
 export const getRawVideoById = async (id: string) => {
   const validatedId = rawVideoIdSchema.parse(id);
-  const { data, error } = await supabase
+  const { data, error } = await getSupabase()
     .from("raw_videos")
     .select("*")
     .eq("id", validatedId)
@@ -78,7 +78,7 @@ export const updateRawVideo = async (
 ) => {
   const validatedId = rawVideoIdSchema.parse(id);
   const validatedChanges = rawVideoUpdateSchema.parse(changes);
-  const { data, error } = await supabase
+  const { data, error } = await getSupabase()
     .from("raw_videos")
     .update(validatedChanges)
     .eq("id", validatedId)
@@ -95,7 +95,7 @@ export const updateRawVideo = async (
 
 export const deleteRawVideo = async (id: string) => {
   const validatedId = rawVideoIdSchema.parse(id);
-  const { data, error } = await supabase
+  const { data, error } = await getSupabase()
     .from("raw_videos")
     .delete()
     .eq("id", validatedId)
@@ -112,7 +112,7 @@ export const deleteRawVideo = async (id: string) => {
 
 export const listRawVideosByPlatform = async (platform: string) => {
   const validatedPlatform = identifierSchema.parse(platform);
-  const { data, error } = await supabase
+  const { data, error } = await getSupabase()
     .from("raw_videos")
     .select("*")
     .eq("platform", validatedPlatform)
@@ -130,7 +130,7 @@ export const listRawVideosByPlatform = async (platform: string) => {
 
 export const listRawVideosByAuthor = async (author: string) => {
   const validatedAuthor = identifierSchema.parse(author);
-  const { data, error } = await supabase
+  const { data, error } = await getSupabase()
     .from("raw_videos")
     .select("*")
     .eq("author", validatedAuthor)
@@ -147,7 +147,7 @@ export const listRawVideosByAuthor = async (author: string) => {
 
 export const listRecentRawVideos = async (limit = 20) => {
   const validatedLimit = z.number().int().positive().parse(limit);
-  const { data, error } = await supabase
+  const { data, error } = await getSupabase()
     .from("raw_videos")
     .select("*")
     .order("collected_at", { ascending: false })

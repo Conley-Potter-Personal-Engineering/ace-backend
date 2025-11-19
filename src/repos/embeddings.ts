@@ -1,4 +1,4 @@
-import { supabase } from "../db/db";
+import { getSupabase } from "../db/db";
 import type { Tables, TablesInsert, TablesUpdate } from "../db/types";
 import { identifierSchema, jsonSchema, nullableDateSchema, z } from "./validators";
 
@@ -17,7 +17,7 @@ const embeddingIdSchema = identifierSchema.describe("embedding_id");
 
 export const createEmbedding = async (payload: TablesInsert<"embeddings">) => {
   const validated = embeddingInsertSchema.parse(payload);
-  const { data, error } = await supabase
+  const { data, error } = await getSupabase()
     .from("embeddings")
     .insert(validated)
     .select("*")
@@ -32,7 +32,7 @@ export const createEmbedding = async (payload: TablesInsert<"embeddings">) => {
 };
 
 export const listEmbeddings = async () => {
-  const { data, error } = await supabase
+  const { data, error } = await getSupabase()
     .from("embeddings")
     .select("*")
     .order("created_at", { ascending: false })
@@ -47,7 +47,7 @@ export const listEmbeddings = async () => {
 
 export const getEmbeddingById = async (embeddingId: string) => {
   const validatedId = embeddingIdSchema.parse(embeddingId);
-  const { data, error } = await supabase
+  const { data, error } = await getSupabase()
     .from("embeddings")
     .select("*")
     .eq("embedding_id", validatedId)
@@ -69,7 +69,7 @@ export const updateEmbedding = async (
 ) => {
   const validatedId = embeddingIdSchema.parse(embeddingId);
   const validatedChanges = embeddingUpdateSchema.parse(changes);
-  const { data, error } = await supabase
+  const { data, error } = await getSupabase()
     .from("embeddings")
     .update(validatedChanges)
     .eq("embedding_id", validatedId)
@@ -86,7 +86,7 @@ export const updateEmbedding = async (
 
 export const deleteEmbedding = async (embeddingId: string) => {
   const validatedId = embeddingIdSchema.parse(embeddingId);
-  const { data, error } = await supabase
+  const { data, error } = await getSupabase()
     .from("embeddings")
     .delete()
     .eq("embedding_id", validatedId)
@@ -106,7 +106,7 @@ export const listEmbeddingsForReference = async (
   referenceType?: string,
 ) => {
   const validatedReferenceId = identifierSchema.parse(referenceId);
-  const query = supabase
+  const query = getSupabase()
     .from("embeddings")
     .select("*")
     .eq("reference_id", validatedReferenceId);
@@ -128,7 +128,7 @@ export const listEmbeddingsForReference = async (
 
 export const listEmbeddingsByType = async (referenceType: string) => {
   const validatedType = identifierSchema.parse(referenceType);
-  const { data, error } = await supabase
+  const { data, error } = await getSupabase()
     .from("embeddings")
     .select("*")
     .eq("reference_type", validatedType)

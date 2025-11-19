@@ -76,7 +76,7 @@ describeIf("ScriptwriterAgent integration", () => {
     });
 
     const agent = new ScriptwriterAgent({ agentName });
-    const result = await agent.execute({ productId });
+    const result = (await agent.execute({ productId })) as any;
 
     scriptId = result?.scriptId;
     expect(result?.script.product_id).toBe(productId);

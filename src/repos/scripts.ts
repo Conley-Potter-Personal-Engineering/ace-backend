@@ -1,6 +1,9 @@
-import { supabase } from "../db/db";
+import { getSupabase } from "../db/db";
 import type { Tables, TablesInsert, TablesUpdate } from "../db/types";
-import type { ScriptInsertDTO } from "../schemas/scriptsSchema";
+import {
+  type ScriptInsertDTO,
+  scriptInsertSchema,
+} from "../schemas/scriptsSchema";
 
 const mapToDbPayload = (
   payload: ScriptInsertDTO,
@@ -16,7 +19,9 @@ const mapToDbPayload = (
 export type ScriptInsertPayload = ScriptInsertDTO;
 
 export const createScript = async (payload: ScriptInsertDTO) => {
-  const { data, error } = await supabase
+  scriptInsertSchema.parse(payload);
+
+  const { data, error } = await getSupabase()
     .from("scripts")
     .insert(mapToDbPayload(payload))
     .select("*")
@@ -31,7 +36,7 @@ export const createScript = async (payload: ScriptInsertDTO) => {
 };
 
 export const listScripts = async () => {
-  const { data, error } = await supabase
+  const { data, error } = await getSupabase()
     .from("scripts")
     .select("*")
     .order("created_at", { ascending: false })
@@ -45,7 +50,7 @@ export const listScripts = async () => {
 };
 
 export const getScriptById = async (scriptId: string) => {
-  const { data, error } = await supabase
+  const { data, error } = await getSupabase()
     .from("scripts")
     .select("*")
     .eq("script_id", scriptId)
@@ -63,7 +68,7 @@ export const updateScript = async (
   scriptId: string,
   changes: TablesUpdate<"scripts">,
 ) => {
-  const { data, error } = await supabase
+  const { data, error } = await getSupabase()
     .from("scripts")
     .update(changes)
     .eq("script_id", scriptId)
@@ -79,7 +84,7 @@ export const updateScript = async (
 };
 
 export const deleteScript = async (scriptId: string) => {
-  const { data, error } = await supabase
+  const { data, error } = await getSupabase()
     .from("scripts")
     .delete()
     .eq("script_id", scriptId)
@@ -95,7 +100,7 @@ export const deleteScript = async (scriptId: string) => {
 };
 
 export const listScriptsForProduct = async (productId: string) => {
-  const { data, error } = await supabase
+  const { data, error } = await getSupabase()
     .from("scripts")
     .select("*")
     .eq("product_id", productId)
@@ -112,7 +117,7 @@ export const listScriptsForProduct = async (productId: string) => {
 };
 
 export const searchScriptsByHook = async (hookFragment: string) => {
-  const { data, error } = await supabase
+  const { data, error } = await getSupabase()
     .from("scripts")
     .select("*")
     .ilike("hook", `%${hookFragment}%`)
@@ -129,7 +134,7 @@ export const searchScriptsByHook = async (hookFragment: string) => {
 
 export const listRecentScripts = async (limit = 10) => {
   const sanitizedLimit = Number.isInteger(limit) && limit > 0 ? limit : 10;
-  const { data, error } = await supabase
+  const { data, error } = await getSupabase()
     .from("scripts")
     .select("*")
     .order("created_at", { ascending: false })
