@@ -1,6 +1,8 @@
-import { supabase } from "../../db/supabase";
 import { embedText } from "../../embeddings/embed";
 import { ChatOpenAI } from "@langchain/openai";
+import { getSupabase } from "../../db/db";
+
+const supabase = getSupabase() as any;
 
 export class ResearchAgent {
   private llm = new ChatOpenAI({ model: "gpt-4.1" });
@@ -32,7 +34,7 @@ export class ResearchAgent {
     );
 
     if (error) throw error;
-    return data;
+    return data ?? [];
   }
 
   async analyze(query: string) {

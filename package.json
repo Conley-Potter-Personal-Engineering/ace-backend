@@ -6,15 +6,24 @@
   "scripts": {
     "dev": "tsx watch src/index.ts",
     "start": "tsx src/index.ts",
-    "generate:types": "supabase gen types typescript --project-id \"$SUPABASE_PROJECT_ID\" > src/db/types.ts"
+    "generate:types": "supabase gen types typescript --project-id \"$SUPABASE_PROJECT_ID\" > src/db/types.ts",
+    "lint": "eslint .",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest",
+    "test:unit": "vitest --run --config vitest.unit.config.ts",
+    "test:integration": "vitest --run --config vitest.integration.config.ts",
+    "build": "tsup src --out-dir dist"
   },
   "dependencies": {
-    "@supabase/supabase-js": "^2.45.0",
+    "@langchain/community": "^0.2.0",
     "@langchain/core": "^0.3.0",
     "@langchain/openai": "^0.2.0",
-    "@langchain/community": "^0.2.0",
+    "@supabase/supabase-js": "^2.45.0",
+    "dotenv": "^17.2.3",
     "pg": "^8.11.3",
-    "pgvector": "^0.2.0"
+    "pgvector": "^0.2.0",
+    "vitest": "^3.2.4",
+    "zod": "^3.25.6"
   },
   "devDependencies": {
     "tsx": "^4.7.0",
