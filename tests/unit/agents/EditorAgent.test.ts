@@ -78,7 +78,8 @@ describe("EditorAgent", () => {
     expect(loggedEvents).toContain("video.render.start");
     expect(loggedEvents).toContain("video.render.success");
 
-    expect(result.assetId).toBe(mockAsset.asset_id);
-    expect(result.asset).toEqual(mockAsset);
+    const typedResult = result as { assetId: string; asset: typeof mockAsset };
+    expect(typedResult.assetId).toBe(mockAsset.asset_id);
+    expect(typedResult.asset).toEqual(mockAsset);
   });
 });
