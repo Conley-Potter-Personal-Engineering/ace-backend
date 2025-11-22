@@ -6,3 +6,10 @@ export function createScriptwriterModel(temperature = 0.7): ChatOpenAI {
     temperature,
   });
 }
+
+export function createEditorModel(temperature = 0.3): ChatOpenAI {
+  return new ChatOpenAI({
+    modelName: process.env.EDITOR_MODEL ?? "gpt-5",
+    temperature,
+  });
+}
