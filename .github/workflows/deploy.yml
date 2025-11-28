@@ -1,31 +1,51 @@
-name: Deploy
+name: Deploy ace-api
 
 on:
-  workflow_run:
-    workflows: ["CI"]
-    types:
-      - completed
+  # Deploy production on main pushes
   push:
     branches:
       - main
 
 jobs:
   deploy:
-    if: ${{ github.event_name == 'push' || github.event.workflow_run.conclusion == 'success' }}
+    name: Build, test, and deploy ace-api
     runs-on: ubuntu-latest
+    env:
+      ACE_ENV: prod
     steps:
-      - uses: actions/checkout@v4
+      # Source control checkout
+      - name: Checkout repository
+        uses: actions/checkout@v4
 
-      - name: Use Node.js
+      # Toolchain setup for Node 20 + npm caching
+      - name: Setup Node.js 20 with npm cache
         uses: actions/setup-node@v4
         with:
-          node-version: '20.x'
-          cache: 'npm'
+          node-version: 20.x
+          cache: npm
 
-      - name: Install Railway
-        run: npm i -g @railway/cli
+      # Install project dependencies
+      - name: Install dependencies (npm ci)
+        run: npm ci
 
-      - name: Deploy
-        run: railway up
-        env:
-          RAILWAY_TOKEN: ${{ secrets.RAILWAY_TOKEN }}
+      # Static analysis gates
+      - name: Lint
+        run: npm run lint
+
+      - name: Type check
+        run: npm run typecheck
+
+      # Test and build verification gates
+      - name: Test
+        run: npm test
+
+      - name: Build
+        run: npm run build
+
+      # Deploy to Railway production project/service
+      - name: Deploy to Railway (ace-api)
+        uses: railwayapp/railway-action@v2
+        with:
+          railway_api_key: ${{ secrets.RAILWAY_API_KEY }}
+          project_id: ${{ secrets.RAILWAY_PROJECT_ID }}
+          service: ace-api

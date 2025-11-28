@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { systemEventInputSchema } from "../../../src/schemas/eventsSchema";
+import { systemEventInputSchema } from "../../../src/schemas/systemEventsSchema";
 
 describe("systemEventInputSchema", () => {
   it("parses valid input", () => {
