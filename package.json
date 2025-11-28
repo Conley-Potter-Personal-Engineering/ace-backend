@@ -9,7 +9,7 @@
     "generate:types": "supabase gen types typescript --project-id \"$SUPABASE_PROJECT_ID\" > src/db/types.ts",
     "lint": "eslint .",
     "typecheck": "tsc --noEmit",
-    "test": "vitest",
+    "test": "tsc --project tsconfig.test.json --noEmit && vitest run",
     "test:unit": "vitest --run --config vitest.unit.config.ts",
     "test:integration": "vitest --run --config vitest.integration.config.ts",
     "build": "tsup src/index.ts --out-dir dist --format cjs"

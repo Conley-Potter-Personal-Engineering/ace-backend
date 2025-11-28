@@ -1,4 +1,4 @@
-import { handleApiError } from "../../../../api/error";
+import { handleApiError } from "../../../api/error";
 import {
   badRequest,
   methodNotAllowed,
@@ -6,8 +6,8 @@ import {
   ok,
   type ApiRequest,
   type ApiResponseLike,
-} from "../../../../api/http";
-import { fetchArtifactDetail } from "../../../../api/handlers/artifactsHandler";
+} from "../../../api/http";
+import { fetchArtifactDetail } from "../../../api/handlers/artifactsHandler";
 
 const extractIdParam = (req: ApiRequest) => {
   const value = req.query?.id;
