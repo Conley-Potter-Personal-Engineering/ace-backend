@@ -6,23 +6,18 @@ import {
   listImportantNotes,
   searchNotesByTopic,
 } from "../repos";
+import {
+  scriptwriterAgentInputSchema,
+  type ScriptwriterAgentInput,
+} from "../schemas/agentSchemas";
 import { generateScript } from "../services/scriptwriterService";
-import { z } from "zod";
-
-export interface ScriptwriterInput {
-  productId: string;
-  warmupNotes?: string[];
-}
 
 export interface ScriptwriterResult {
   scriptId: string;
   script: Tables<"scripts">;
 }
 
-const scriptwriterInputSchema = z.object({
-  productId: z.string().uuid(),
-  warmupNotes: z.array(z.string()).optional(),
-});
+export type ScriptwriterInput = ScriptwriterAgentInput;
 
 export class ScriptwriterAgent extends BaseAgent {
   constructor({ agentName = "ScriptwriterAgent" } = {}) {
@@ -31,7 +26,7 @@ export class ScriptwriterAgent extends BaseAgent {
 
   async run(rawInput: ScriptwriterInput): Promise<ScriptwriterResult> {
     try {
-      const input = scriptwriterInputSchema.parse(rawInput);
+      const input = scriptwriterAgentInputSchema.parse(rawInput);
       await this.logEvent("script.generate.start", { productId: input.productId });
 
       const product = await getProductById(input.productId);
