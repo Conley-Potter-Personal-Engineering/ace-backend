@@ -5,7 +5,9 @@
 	"type": "module",
 	"scripts": {
 		"dev": "next dev",
-		"build": "tsup src/server.ts --out-dir dist --format cjs",
+		"build:next": "next build",
+		"build:server": "tsup src/server.ts --out-dir dist --format cjs",
+		"build": "npm run build:next && npm run build:server",
 		"start": "node dist/server.cjs",
 		"generate:types": "supabase gen types typescript --project-id \"$SUPABASE_PROJECT_ID\" > src/db/types.ts",
 		"lint": "eslint .",

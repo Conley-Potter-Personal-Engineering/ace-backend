@@ -1,17 +1,15 @@
-# ---- Base build stage ----
+# ---- Builder stage ----
 FROM node:20-alpine AS builder
 WORKDIR /app
 
-# Copy only package manifests first for dependency caching
-COPY package*.json ./
-
 # Install dependencies
+COPY package*.json ./
 RUN npm ci
 
-# Copy rest of the source code
+# Copy full project
 COPY . .
 
-# Build the project (compiles server.ts → dist/server.js)
+# Build Next.js and compile custom server
 RUN npm run build
 
 # ---- Runtime stage ----
@@ -19,18 +17,20 @@ FROM node:20-alpine AS runner
 WORKDIR /app
 ENV NODE_ENV=production
 
-# Copy only what’s needed for runtime
+# Copy necessary runtime files
 COPY --from=builder /app/package*.json ./
 COPY --from=builder /app/node_modules ./node_modules
+COPY --from=builder /app/.next ./.next
 COPY --from=builder /app/dist ./dist
-COPY --from=builder /app/src/pages ./src/pages
 
-# Expose the app port
+# Note: skip /public since this repo has none
+
+# Expose API port
 EXPOSE 3000
 
-# Healthcheck (optional, but recommended)
-HEALTHCHECK --interval=30s --timeout=5s --start-period=10s \
+# Healthcheck for Railway CI smoke test
+HEALTHCHECK --interval=30s --timeout=5s \
   CMD wget -qO- http://localhost:3000/api/health || exit 1
 
-# Start command (Next.js custom server)
-CMD ["node", "dist/server.js"]
+# Entrypoint (Next.js custom server)
+CMD ["node", "dist/server.cjs"]
