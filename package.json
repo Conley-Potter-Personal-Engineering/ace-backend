@@ -15,7 +15,8 @@
 		"typecheck:all": "tsc --project tsconfig.test.json",
 		"test": "tsc --project tsconfig.test.json --noEmit && vitest run",
 		"test:unit": "vitest --run --config vitest.unit.config.ts",
-		"test:integration": "vitest --run --config vitest.integration.config.ts"
+		"test:integration": "vitest --run --config vitest.integration.config.ts",
+		"seed": "tsx scripts/seed.ts"
 	},
 	"dependencies": {
 		"@langchain/community": "^0.2.0",
