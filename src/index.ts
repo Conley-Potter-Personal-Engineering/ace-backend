@@ -1,17 +1,14 @@
-import { ResearchAgent } from "./agents/research/researchAgent";
+import dotenv from "dotenv";
+import { join } from "path";
+
+// Load environment variables from config/.env.local
+dotenv.config({ path: join(process.cwd(), "config/.env.local") });
+
 
 async function main() {
-  const agent = new ResearchAgent();
 
   console.log("Ingesting sample text...");
-  await agent.ingestContent(
-    "sample",
-    "AI agents are increasingly being used for automated market research."
-  );
 
-  const output = await agent.analyze("What trends are emerging?");
-  console.log("Analysis:");
-  console.log(output);
 }
 
 main().catch(err => {

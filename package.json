@@ -1,32 +1,44 @@
 {
-  "name": "research-agent",
-  "version": "0.1.0",
-  "private": true,
-  "type": "module",
-  "scripts": {
-    "dev": "tsx watch src/index.ts",
-    "start": "tsx src/index.ts",
-    "generate:types": "supabase gen types typescript --project-id \"$SUPABASE_PROJECT_ID\" > src/db/types.ts",
-    "lint": "eslint .",
-    "typecheck": "tsc --noEmit",
-    "test": "vitest",
-    "test:unit": "vitest --run --config vitest.unit.config.ts",
-    "test:integration": "vitest --run --config vitest.integration.config.ts",
-    "build": "tsup src --out-dir dist"
-  },
-  "dependencies": {
-    "@langchain/community": "^0.2.0",
-    "@langchain/core": "^0.3.0",
-    "@langchain/openai": "^0.2.0",
-    "@supabase/supabase-js": "^2.45.0",
-    "dotenv": "^17.2.3",
-    "pg": "^8.11.3",
-    "pgvector": "^0.2.0",
-    "vitest": "^3.2.4",
-    "zod": "^3.25.6"
-  },
-  "devDependencies": {
-    "tsx": "^4.7.0",
-    "typescript": "^5.6.2"
-  }
+	"name": "research-agent",
+	"version": "0.1.0",
+	"private": true,
+	"type": "module",
+	"scripts": {
+		"dev": "next dev",
+		"build:next": "next build",
+		"build:server": "tsup src/server.ts --out-dir dist --format cjs",
+		"build": "npm run build:next && npm run build:server",
+		"start": "node dist/server.cjs",
+		"generate:types": "supabase gen types typescript --project-id \"$SUPABASE_PROJECT_ID\" > src/db/types.ts",
+		"lint": "eslint .",
+		"typecheck": "tsc --noEmit",
+		"typecheck:all": "tsc --project tsconfig.test.json",
+		"test": "tsc --project tsconfig.test.json --noEmit && vitest run",
+		"test:unit": "vitest --run --config vitest.unit.config.ts",
+		"test:integration": "vitest --run --config vitest.integration.config.ts",
+		"seed": "tsx scripts/seed.ts"
+	},
+	"dependencies": {
+		"@langchain/community": "^0.2.0",
+		"@langchain/core": "^0.3.0",
+		"@langchain/openai": "^0.2.0",
+		"@supabase/supabase-js": "^2.45.0",
+		"dotenv": "^17.2.3",
+		"express": "^5.1.0",
+		"next": "^16.0.5",
+		"pg": "^8.11.3",
+		"pgvector": "^0.2.0",
+		"vitest": "^3.2.4",
+		"zod": "^3.25.6"
+	},
+	"devDependencies": {
+		"@eslint/js": "^9.39.1",
+		"@types/react": "19.2.7",
+		"eslint": "^9.39.1",
+		"supertest": "^7.1.4",
+		"tsup": "^8.5.1",
+		"tsx": "^4.7.0",
+		"typescript": "^5.6.2",
+		"typescript-eslint": "^8.47.0"
+	}
 }

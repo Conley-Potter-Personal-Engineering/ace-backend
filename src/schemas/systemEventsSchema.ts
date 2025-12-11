@@ -5,6 +5,7 @@ const payloadSchema = z.record(z.any());
 export const systemEventInputSchema = z.object({
   eventType: z.string().trim().min(1, "Event type is required"),
   agentName: z.string().trim().min(1).optional(),
+  eventId: z.string().uuid().optional(),
   payload: payloadSchema.optional(),
 });
 

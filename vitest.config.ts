@@ -10,12 +10,4 @@ export default defineConfig({
       "@": resolve(__dirname, "src"),
     },
   },
-  test: {
-    environment: "node",
-    include: ["tests/unit/**/*.test.ts"],
-    setupFiles: ["./tests/utils/setupUnitTests.ts"],
-    clearMocks: true,
-    restoreMocks: true,
-    mockReset: true,
-  },
 });

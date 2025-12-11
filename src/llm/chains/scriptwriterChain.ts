@@ -15,16 +15,13 @@ interface RunScriptwriterChainParams {
   notes: Tables<"agent_notes">[];
 }
 
-const model = createScriptwriterModel();
-
-const scriptwriterRunnable = RunnableSequence.from<
-  ScriptwriterPromptInput,
-  ScriptwriterParserOutput
->([
-  buildScriptwriterPrompt,
-  model as any,
-  scriptwriterOutputParser,
-]);
+const buildScriptwriterRunnable = () =>
+  RunnableSequence.from<ScriptwriterPromptInput, ScriptwriterParserOutput>([
+    buildScriptwriterPrompt,
+    // Create the model lazily so environment variables are read after setup.
+    createScriptwriterModel() as any,
+    scriptwriterOutputParser,
+  ]);
 
 export interface ScriptwriterChainResult {
   scriptText: string;
@@ -55,7 +52,7 @@ export async function runScriptwriterChain({
     notes: buildNotesSummary(notes),
   };
 
-  const parsed = await scriptwriterRunnable.invoke(promptInput);
+  const parsed = await buildScriptwriterRunnable().invoke(promptInput);
 
   return {
     scriptText: parsed.scriptText,

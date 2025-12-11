@@ -13,3 +13,9 @@ config/.env.local
 config/.env.development
 config/.env.production
 config/.env.test
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+.pnpm-store/
+.next/
