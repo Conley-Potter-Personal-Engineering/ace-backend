@@ -69,7 +69,7 @@ const buildPrompt = (input: ScriptWriterInputType): string => {
   const creativeVariablesBlock = formatCreativeVariables(creativeVariables ?? {});
 
   return [
-    "You are ACE's Scriptwriter v2. Create a concise, persuasive short-form video script grounded in the provided context.",
+    "You are the Autonomous Content Engine's (ACE) Scriptwriter v2. Create a concise, persuasive short-form video script grounded in the provided context.",
     "Return ONLY a JSON object with this exact shape:",
     JSON.stringify(
       {

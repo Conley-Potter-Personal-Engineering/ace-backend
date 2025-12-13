@@ -1,10 +1,12 @@
 import { z } from "zod";
 
-const creativeVariablesSchema = z.object({
-  emotion: z.string().trim().min(1, "Emotion is required"),
-  structure: z.string().trim().min(1, "Structure is required"),
-  style: z.string().trim().min(1, "Style is required"),
-});
+const creativeVariablesSchema = z
+  .object({
+    emotion: z.string().trim().min(1, "Emotion is required"),
+    structure: z.string().trim().min(1, "Structure is required"),
+    style: z.string().trim().min(1, "Style is required"),
+  })
+  .passthrough();
 
 export const scriptInsertSchema = z.object({
   scriptId: z.string().uuid().optional(),

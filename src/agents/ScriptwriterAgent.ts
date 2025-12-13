@@ -1,11 +1,16 @@
-import { scriptwriterChain } from "@/llm/chains/scriptwriterChain";
 import type { Tables } from "@/db/types";
+import { scriptwriterChain } from "@/llm/chains/scriptwriterChain";
 import * as agentNotesRepo from "@/repos/agentNotes";
 import * as creativePatternsRepo from "@/repos/creativePatterns";
 import * as productsRepo from "@/repos/products";
 import * as scriptsRepo from "@/repos/scripts";
 import * as trendSnapshotsRepo from "@/repos/trendSnapshots";
-import { ScriptOutput, ScriptWriterInput } from "@/schemas/scriptwriterSchemas";
+import {
+  ScriptOutput,
+  ScriptWriterInput,
+  type ScriptOutputType,
+  type ScriptWriterInputType,
+} from "@/schemas/scriptwriterSchemas";
 import BaseAgent from "./BaseAgent";
 
 type CreativePattern = Tables<"creative_patterns">;
@@ -33,7 +38,7 @@ const summarizeTrend = (snapshot: TrendSnapshot): string => {
   return `Trend ${snapshot.snapshot_id}: tags=${tags}; velocity=${velocity}; popularity=${popularity}`;
 };
 
-const formatScriptText = (output: ScriptOutput): string => {
+const formatScriptText = (output: ScriptOutputType): string => {
   const outline = output.outline.length
     ? output.outline.map((beat, index) => `${index + 1}. ${beat}`).join("\n")
     : "No outline provided.";
@@ -74,17 +79,15 @@ export class ScriptwriterAgent extends BaseAgent {
         trendSnapshotsRepo.listSnapshotsForProduct(input.productId),
       ]);
 
-      const resolvedPatternSummaries =
-        input.patternSummaries?.length ?? 0
-          ? input.patternSummaries
-          : creativePatterns.map(summarizePattern);
+      const resolvedPatternSummaries = input.patternSummaries.length
+        ? input.patternSummaries
+        : creativePatterns.map(summarizePattern);
 
-      const resolvedTrendSummaries =
-        input.trendSummaries?.length ?? 0
-          ? input.trendSummaries
-          : trendSnapshots.map(summarizeTrend);
+      const resolvedTrendSummaries = input.trendSummaries.length
+        ? input.trendSummaries
+        : trendSnapshots.map(summarizeTrend);
 
-      const chainInput = {
+      const chainInput: ScriptWriterInputType = {
         productId: input.productId,
         productSummary:
           input.productSummary ||
