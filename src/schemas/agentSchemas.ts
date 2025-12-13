@@ -54,3 +54,30 @@ export const editorChainOutputSchema = z.object({
 });
 
 export type EditorChainOutput = z.infer<typeof editorChainOutputSchema>;
+
+export const EditorRequestSchema = z.object({
+  scriptId: z.string().uuid("scriptId must be a valid UUID"),
+  composition: z.object({
+    duration: z.number().positive("Duration must be positive"),
+    tone: z.string().trim().min(1, "Tone is required"),
+    layout: z.string().trim().min(1, "Layout is required"),
+  }),
+  styleTemplateId: z.string().trim().min(1).optional(),
+  renderBackend: z
+    .enum(["local", "s3", "supabase"])
+    .default("supabase"),
+});
+
+export type EditorRequest = z.infer<typeof EditorRequestSchema>;
+
+export const VideoAssetSchema = z.object({
+  id: z.string().uuid("id must be a valid UUID").optional(),
+  scriptId: z.string().uuid("scriptId must be a valid UUID"),
+  storageUrl: z.string().url("storageUrl must be a valid URL"),
+  duration: z.number().positive("Duration must be positive"),
+  tone: z.string().trim().min(1, "Tone is required"),
+  layout: z.string().trim().min(1, "Layout is required"),
+  styleTags: z.array(z.string().trim().min(1)).optional(),
+});
+
+export type VideoAsset = z.infer<typeof VideoAssetSchema>;
