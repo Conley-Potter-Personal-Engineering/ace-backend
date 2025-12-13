@@ -1,28 +1,25 @@
-import { uploadToS3, uploadToSupabase } from "./storageClients";
+import { uploadToSupabase } from "@/utils/storageClients/supabaseClient";
+import { uploadToS3 } from "@/utils/storageClients/s3Client";
 
 export type StorageBackend = "supabase" | "s3";
 
 /**
- * Uploads a file buffer to the configured storage backend.
- * - For `supabase`, delegates to `uploadToSupabase`.
- * - For `s3`, delegates to `uploadToS3`.
- * On failure, throws an Error that prefixes the backend for easier debugging.
- * Throws `Error("Unsupported backend")` when an unknown backend is provided.
+ * Uploads a file buffer to the selected storage backend and returns its URL.
+ * Delegates to Supabase or S3 clients and rethrows descriptive errors on failure.
  */
 export const storageUploader = async (
   file: Buffer,
   backend: StorageBackend,
 ): Promise<string> => {
-  if (backend !== "supabase" && backend !== "s3") {
-    throw new Error("Unsupported backend");
-  }
-
   try {
-    if (backend === "supabase") {
-      return await uploadToSupabase(file);
+    switch (backend) {
+      case "supabase":
+        return await uploadToSupabase(file);
+      case "s3":
+        return await uploadToS3(file);
+      default:
+        throw new Error("Unsupported backend");
     }
-
-    return await uploadToS3(file);
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
     throw new Error(`Failed to upload via ${backend}: ${message}`);
