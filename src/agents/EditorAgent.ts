@@ -4,7 +4,7 @@ import { getScriptById } from "../repos";
 import {
   editorAgentInputSchema,
   type EditorAgentInput,
-} from "../schemas/editorSchemas";
+} from "../schemas/agentSchemas";
 import {
   renderVideoAsset,
   type RenderedAssetResult,
