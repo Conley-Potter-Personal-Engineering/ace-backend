@@ -8,6 +8,7 @@ import {
   buildEditorPrompt,
   type EditorPromptInput,
 } from "../prompts/editorPrompt";
+import { type EditorRequest } from "../../schemas/editorSchemas";
 
 interface RunEditorChainParams {
   scriptText: string;
@@ -70,5 +71,49 @@ export async function runEditorChain({
     thumbnailPath: parsed.thumbnailPath,
     durationSeconds: parsed.durationSeconds,
     metadata: parsed.metadata,
+  };
+}
+
+export interface EditorChainInvocationOutput extends EditorChainResult {
+  styleTags: string[];
+  mockVideo: string;
+}
+
+const buildMockVideo = (
+  composition: EditorRequest["composition"],
+  styleTemplateId?: string,
+): string => {
+  const styleLabel = styleTemplateId ?? "default-style";
+  return [
+    `duration=${composition.duration}`,
+    `tone=${composition.tone}`,
+    `layout=${composition.layout}`,
+    `style=${styleLabel}`,
+  ].join("|");
+};
+
+const defaultStorageHint = (styleTemplateId?: string): string => {
+  const safeStyle = styleTemplateId?.replace(/\s+/g, "-").toLowerCase() ?? "default";
+  return `videos/rendered/${safeStyle}.mp4`;
+};
+
+export default async function editorChain(
+  scriptContent: string,
+  composition: EditorRequest["composition"],
+  styleTemplateId?: string,
+): Promise<EditorChainInvocationOutput> {
+  const baseResult = await runEditorChain({
+    scriptText: scriptContent,
+    creativeVariables: composition,
+    storagePathHint: defaultStorageHint(styleTemplateId),
+  });
+
+  const styleTags = styleTemplateId ? [styleTemplateId] : [];
+
+  return {
+    ...baseResult,
+    durationSeconds: baseResult.durationSeconds ?? composition.duration,
+    styleTags,
+    mockVideo: buildMockVideo(composition, styleTemplateId),
   };
 }
