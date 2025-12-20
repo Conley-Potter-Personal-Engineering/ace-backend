@@ -8,7 +8,6 @@ import {
 } from "../../schemas/agentSchemas";
 import {
   agentNameSchema,
-  agentRunRequestSchema,
   type AgentName,
 } from "../../schemas/apiSchemas";
 import { z } from "zod";
@@ -27,6 +26,19 @@ interface AgentDescriptor {
   inputSchema: z.ZodTypeAny;
 }
 
+type TriggerAgentRunSuccess = {
+  message: string;
+  result: unknown;
+};
+
+type TriggerAgentRunError = {
+  error: string;
+  details: z.ZodFormattedError<{
+    agent: AgentName;
+    input: Record<string, unknown>;
+  }>;
+};
+
 const agentRegistry: Record<AgentName, AgentDescriptor> = {
   ScriptwriterAgent: {
     create: () => new ScriptwriterAgent(),
@@ -37,6 +49,11 @@ const agentRegistry: Record<AgentName, AgentDescriptor> = {
     inputSchema: editorAgentInputSchema,
   },
 };
+
+const runAgentSchema = z.object({
+  agent: agentNameSchema,
+  input: z.record(z.any()),
+});
 
 const deriveStatus = (eventType?: string | null): AgentStatus => {
   if (!eventType) {
@@ -106,48 +123,68 @@ export const listAgentStatuses = async (): Promise<AgentStatusRow[]> => {
 export const triggerAgentRun = async (
   agentName: string,
   rawBody: unknown,
-) => {
-  const validatedName = agentNameSchema.parse(agentName);
-  const agent = agentRegistry[validatedName];
+): Promise<TriggerAgentRunSuccess | TriggerAgentRunError> => {
+  const parsedRequest = runAgentSchema.safeParse(rawBody);
+  if (!parsedRequest.success) {
+    return {
+      error: "Invalid run agent payload",
+      details: parsedRequest.error.format(),
+    };
+  }
 
-  if (!agent) {
-    throw new Error(`Agent ${validatedName} is not registered`);
+  const { agent: requestedAgentName, input } = parsedRequest.data;
+  const pathNameMatch = agentNameSchema.safeParse(agentName);
+  if (pathNameMatch.success && pathNameMatch.data !== requestedAgentName) {
+    throw new Error(
+      `Agent ${pathNameMatch.data} does not match payload agent ${requestedAgentName}`,
+    );
+  }
+
+  const agentDescriptor = agentRegistry[requestedAgentName];
+
+  if (!agentDescriptor) {
+    throw new Error(`Agent ${requestedAgentName} is not registered`);
   }
 
   console.log("Raw body:", rawBody);
 
-  const parsedBody = agentRunRequestSchema.parse(rawBody ?? {});
-  const parsedInput = agent.inputSchema.parse(parsedBody.input ?? {});
+  const validatedInput = agentDescriptor.inputSchema.parse(input ?? {});
   const startedAt = new Date().toISOString();
 
   await logSystemEvent({
-    agent_name: validatedName,
+    agent_name: requestedAgentName,
     event_type: "agent.start",
-    payload: { trigger: "manual_api", input: parsedInput },
+    payload: { trigger: "manual_api", input: validatedInput },
     created_at: startedAt,
   });
 
   try {
-    const result = await agent.create().execute(parsedInput);
+    console.log("Triggering agent run:", {
+      agent: requestedAgentName,
+      validatedInput,
+    });
+
+    const agentInstance = agentDescriptor.create();
+    const result = await agentInstance.run(validatedInput);
 
     await logSystemEvent({
-      agent_name: validatedName,
+      agent_name: requestedAgentName,
       event_type: "agent.success",
-      payload: { trigger: "manual_api", input: parsedInput },
+      payload: { trigger: "manual_api", input: validatedInput },
       created_at: new Date().toISOString(),
     });
 
     return {
-      message: `Agent ${validatedName} started`,
+      message: `Agent ${requestedAgentName} started`,
       result,
     };
   } catch (error) {
     await logSystemEvent({
-      agent_name: validatedName,
+      agent_name: requestedAgentName,
       event_type: "agent.error",
       payload: {
         trigger: "manual_api",
-        input: parsedInput,
+        input: validatedInput,
         message: error instanceof Error ? error.message : String(error),
       },
       created_at: new Date().toISOString(),
