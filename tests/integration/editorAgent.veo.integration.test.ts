@@ -17,7 +17,7 @@ function createInMemorySupabase() {
   };
 
   const buildQuery = (table: TableName) => {
-    let filters: Array<(row: Row) => boolean> = [];
+    const filters: Array<(row: Row) => boolean> = [];
     let orderSpec: { column: string; ascending: boolean } | null = null;
     let responseData: Row[] = [];
     let hasExplicitResponse = false;

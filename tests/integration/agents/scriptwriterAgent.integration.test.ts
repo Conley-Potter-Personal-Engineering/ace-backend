@@ -29,7 +29,7 @@ function createInMemorySupabase() {
   };
 
   const buildQuery = (table: TableName) => {
-    let filters: Array<(row: Row) => boolean> = [];
+    const filters: Array<(row: Row) => boolean> = [];
     let orderSpec: { column: string; ascending: boolean } | null = null;
     let responseData: Row[] = [];
     let hasExplicitResponse = false;
@@ -122,7 +122,7 @@ function createInMemorySupabase() {
         hasExplicitResponse = true;
         return response;
       },
-      ilike: (_column: string, _value: string) => response,
+      ilike: () => response,
       returns: () => response,
       single: async () => ({
         data: (hasExplicitResponse ? responseData : applyFilters())[0] ?? null,
@@ -190,7 +190,6 @@ describeIf("ScriptwriterAgent integration", () => {
   const baseAgentName = "ScriptwriterAgentIntegration";
   let agentName: string;
   let productId: string;
-  let scriptId: string | undefined;
 
   beforeEach(async () => {
     agentName = `${baseAgentName}-${randomUUID()}`;
@@ -267,7 +266,6 @@ describeIf("ScriptwriterAgent integration", () => {
 
     const agent = new ScriptwriterAgent({ agentName });
     const result = await agent.run(input);
-    scriptId = result.scriptId;
 
     expect(chainSpy).toHaveBeenCalledWith({
       productId,
