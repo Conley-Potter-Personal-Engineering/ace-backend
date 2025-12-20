@@ -1,23 +1,20 @@
 import type { User } from "@supabase/supabase-js";
+import type { NextApiRequest, NextApiResponse } from "next";
+
 import { getSupabase } from "@/db/supabase";
-import { logSystemEvent } from "../../repos/systemEvents";
-import type { Json } from "../../db/types";
-import { signupRequestSchema, type SignupRequest } from "../../schemas/apiSchemas";
+import type { Json } from "@/db/types";
+import { logSystemEvent } from "@/repos/systemEvents";
+import { signupRequestSchema, type SignupRequest } from "@/schemas/apiSchemas";
 
-interface SignupSuccess {
-  success: true;
-  data: {
-    user: Pick<User, "id" | "email">;
-    message: string;
-  };
-}
-
-interface SignupFailure {
-  success: false;
-  error: string;
-}
-
-type SignupResponse = SignupSuccess | SignupFailure;
+type SignupResponse =
+  | {
+      success: true;
+      data: {
+        user: Pick<User, "id" | "email">;
+        message: string;
+      };
+    }
+  | { success: false; error: string };
 
 const logAuthEvent = async (
   eventType: string,
@@ -35,20 +32,22 @@ const logAuthEvent = async (
   }
 };
 
-export const signup = async (rawBody: unknown): Promise<SignupResponse> => {
-  const supabase = getSupabase();
-
+export const authSignupHandler = async (
+  req: NextApiRequest,
+  res: NextApiResponse<SignupResponse>,
+) => {
   let credentials: SignupRequest;
   try {
-    credentials = signupRequestSchema.parse(rawBody ?? {});
+    credentials = signupRequestSchema.parse(req.body ?? {});
   } catch (err) {
     const message =
       err instanceof Error ? err.message : "Invalid signup payload";
     await logAuthEvent("auth.signup.error", { message });
     console.error("[auth] Signup validation failed", err);
-    return { success: false, error: message };
+    return res.status(400).json({ success: false, error: message });
   }
 
+  const supabase = getSupabase();
   await logAuthEvent("auth.signup.start", { email: credentials.email });
 
   try {
@@ -64,7 +63,7 @@ export const signup = async (rawBody: unknown): Promise<SignupResponse> => {
         message,
       });
       console.error("[auth] Sign-up failed", error);
-      return { success: false, error: message };
+      return res.status(400).json({ success: false, error: message });
     }
 
     const userEmail = data.user.email ?? credentials.email;
@@ -73,13 +72,13 @@ export const signup = async (rawBody: unknown): Promise<SignupResponse> => {
       userId: data.user.id,
     });
 
-    return {
+    return res.status(200).json({
       success: true,
       data: {
         user: { id: data.user.id, email: userEmail },
         message: "Sign-up successful. Please verify your email.",
       },
-    };
+    });
   } catch (err) {
     const message =
       err instanceof Error ? err.message : "Unexpected sign-up error";
@@ -88,8 +87,8 @@ export const signup = async (rawBody: unknown): Promise<SignupResponse> => {
       message,
     });
     console.error("[auth] Unexpected sign-up error", err);
-    return { success: false, error: message };
+    return res.status(500).json({ success: false, error: message });
   }
 };
 
-export default signup;
+export default authSignupHandler;

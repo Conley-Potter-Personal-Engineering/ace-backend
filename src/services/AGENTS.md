@@ -19,3 +19,10 @@ Services orchestrate LLM calls, validation, and DTO shaping.
 • import LLM chains from /src/llm  
 • validate all inputs and outputs  
 • avoid side effects  
+
+### Deprecated: ScriptwriterService
+The ScriptwriterService has been deprecated as of the ScriptwriterAgent V2 upgrade.
+All responsibilities (LLM invocation, validation, and payload shaping) are now handled
+directly within the ScriptwriterAgent and scriptwriterChain modules.
+
+It should not be reintroduced or referenced in new code.

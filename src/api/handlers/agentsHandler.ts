@@ -2,8 +2,10 @@ import { EditorAgent } from "../../agents/EditorAgent";
 import { ScriptwriterAgent } from "../../agents/ScriptwriterAgent";
 import type BaseAgent from "../../agents/BaseAgent";
 import { fetchRecentSystemEvents, logSystemEvent } from "../../repos/systemEvents";
-import { scriptwriterAgentInputSchema } from "../../schemas/agentSchemas";
-import { editorAgentInputSchema } from "../../schemas/editorSchemas";
+import {
+  editorAgentInputSchema,
+  scriptwriterAgentInputSchema,
+} from "../../schemas/agentSchemas";
 import {
   agentNameSchema,
   agentRunRequestSchema,

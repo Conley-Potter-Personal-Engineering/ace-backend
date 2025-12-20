@@ -1,19 +1,25 @@
+import editorChain, {
+  type EditorChainInvocationOutput,
+} from "@/llm/chains/editorChain";
+import * as scriptsRepo from "@/repos/scripts";
+import * as video_assetsRepo from "@/repos/videoAssets";
+import {
+  EditorRequestSchema,
+  editorChainOutputSchema,
+  type EditorRequest,
+  VideoAssetSchema,
+  type VideoAsset,
+} from "@/schemas/editorSchemas";
+import { storageUploader } from "@/utils/storageUploader";
+import generateVideoWithVeo from "@/utils/veoVideoGenerator";
+import type { Tables } from "@/db/types";
 import BaseAgent from "./BaseAgent";
-import type { Tables } from "../db/types";
-import { getScriptById } from "../repos";
-import {
-  editorAgentInputSchema,
-  type EditorAgentInput,
-} from "../schemas/editorSchemas";
-import {
-  renderVideoAsset,
-  type RenderedAssetResult,
-} from "../services/editorService";
 
 export interface EditorAgentResult {
-  assetId: string;
-  asset: Tables<"video_assets">;
-  metadata: RenderedAssetResult["metadata"];
+  asset: VideoAsset;
+  metadata: EditorChainInvocationOutput["metadata"];
+  persistedAsset: Tables<"video_assets">;
+  storageUrl: string;
 }
 
 export class EditorAgent extends BaseAgent {
@@ -21,17 +27,18 @@ export class EditorAgent extends BaseAgent {
     super(agentName);
   }
 
-  async run(rawInput: EditorAgentInput): Promise<EditorAgentResult> {
-    try {
-      const input = editorAgentInputSchema.parse(rawInput);
-      await this.logEvent("video.render.start", { scriptId: input.scriptId });
+  async run(rawInput: unknown): Promise<EditorAgentResult> {
+    await this.logEvent("agent.start", { input: rawInput });
+    await this.logEvent("video.render.start", { input: rawInput });
 
-      const script = await getScriptById(input.scriptId);
+    let renderPlanPrepared = false;
+    let agentErrorLogged = false;
+
+    try {
+      const input = EditorRequestSchema.parse(rawInput);
+
+      const script = await scriptsRepo.findById(input.scriptId);
       if (!script) {
-        await this.logEvent("video.render.error", {
-          scriptId: input.scriptId,
-          message: "Script not found",
-        });
         throw new Error(`Script ${input.scriptId} not found`);
       }
 
@@ -40,42 +47,195 @@ export class EditorAgent extends BaseAgent {
         productId: script.product_id,
       });
 
-      const { asset, metadata } = await renderVideoAsset({
-        script,
-        overrideStoragePath: input.overrideStoragePath,
+      const chainResult = await editorChain(
+        script.script_text ?? "",
+        input.composition,
+        input.styleTemplateId,
+      );
+
+      const validatedChain = editorChainOutputSchema.parse({
+        storagePath: chainResult.storagePath,
+        durationSeconds: chainResult.durationSeconds,
+        thumbnailPath: chainResult.thumbnailPath,
+        metadata: chainResult.metadata,
+      });
+
+      const styleTags = this.deriveStyleTags(chainResult.styleTags, input.styleTemplateId);
+      const renderPlan = {
+        title: validatedChain.metadata.title,
+        scriptSummary: validatedChain.metadata.summary,
+        tone: input.composition.tone,
+        layout: input.composition.layout,
+        duration: validatedChain.durationSeconds ?? input.composition.duration,
+        styleTags,
+      };
+
+      renderPlanPrepared = true;
+
+      await this.logEvent("video.render.success", {
+        scriptId: input.scriptId,
+        storagePath: validatedChain.storagePath,
+        duration: renderPlan.duration,
+        styleTags,
+        metadata: validatedChain.metadata,
+      });
+
+      let videoBuffer: Buffer | null = null;
+      let generationMetadata: { duration?: number; format: string } | null = null;
+
+      try {
+        await this.logEvent("video.generate.start", {
+          scriptId: input.scriptId,
+          tone: renderPlan.tone,
+          layout: renderPlan.layout,
+        });
+
+        const prompt = `Generate a ${renderPlan.duration}-second ${renderPlan.tone} video in ${renderPlan.layout} style about: ${
+          renderPlan.scriptSummary || renderPlan.title
+        }.`;
+        const generationResult = await generateVideoWithVeo(prompt, {
+          duration: renderPlan.duration,
+        });
+        videoBuffer = generationResult.buffer;
+        generationMetadata = generationResult.metadata;
+
+        await this.logEvent("video.generate.success", {
+          scriptId: input.scriptId,
+          duration: generationMetadata.duration,
+          size: generationResult.buffer.length,
+          format: generationMetadata.format,
+        });
+      } catch (generationError) {
+        const message =
+          generationError instanceof Error ? generationError.message : String(generationError);
+        await this.logEvent("video.generate.error", {
+          scriptId: input.scriptId,
+          message,
+        });
+        await this.logEvent("agent.error", {
+          scriptId: input.scriptId,
+          message,
+        });
+        agentErrorLogged = true;
+        throw generationError;
+      }
+
+      if (!videoBuffer || !generationMetadata) {
+        throw new Error("Video generation failed: Missing video buffer or metadata");
+      }
+
+      const storageUrl = await this.uploadWithRetry(
+        videoBuffer,
+        input.renderBackend,
+        input.scriptId,
+      );
+
+      const assetPayload = VideoAssetSchema.parse({
+        scriptId: input.scriptId,
+        storageUrl,
+        duration: generationMetadata.duration ?? renderPlan.duration,
+        tone: renderPlan.tone,
+        layout: renderPlan.layout,
+        styleTags: renderPlan.styleTags,
+      });
+
+      const { asset, record } = await video_assetsRepo.create(assetPayload);
+
+      await this.logEvent("video.assets.uploaded", {
+        scriptId: input.scriptId,
+        storageUrl,
+        backend: input.renderBackend,
       });
 
       await this.logEvent("video.assets.created", {
-        assetId: asset.asset_id,
-        scriptId: script.script_id,
-        storagePath: asset.storage_path,
+        assetId: record.asset_id,
+        scriptId: input.scriptId,
+        storagePath: record.storage_path,
+        durationSeconds: record.duration_seconds,
       });
 
-      const note = await this.storeNote(
-        "video_render",
-        `Rendered asset ${asset.asset_id} for script ${script.script_id}`,
-      );
-      await this.logEvent("memory.note_stored", {
-        noteId: note.note_id,
-        assetId: asset.asset_id,
-      });
-
-      await this.logEvent("video.render.success", {
-        scriptId: script.script_id,
-        assetId: asset.asset_id,
+      await this.logEvent("agent.success", {
+        scriptId: input.scriptId,
+        assetId: record.asset_id,
       });
 
       return {
-        assetId: asset.asset_id,
         asset,
-        metadata,
+        metadata: validatedChain.metadata,
+        persistedAsset: record,
+        storageUrl,
       };
     } catch (error) {
-      await this.logEvent("video.render.error", {
-        message: error instanceof Error ? error.message : String(error),
-      });
+      const message = error instanceof Error ? error.message : String(error);
+      const scriptId = (rawInput as Record<string, unknown> | null)?.scriptId ?? null;
+
+      if (!renderPlanPrepared) {
+        await this.logEvent("video.render.error", {
+          scriptId,
+          message,
+        });
+      }
+
+      if (!agentErrorLogged) {
+        await this.logEvent("agent.error", {
+          scriptId,
+          message,
+        });
+      }
       return this.handleError("EditorAgent.run", error);
     }
+  }
+
+  private deriveStyleTags(
+    chainStyleTags: string[] | undefined,
+    styleTemplateId: string | undefined,
+  ): string[] {
+    if (chainStyleTags?.length) {
+      return chainStyleTags;
+    }
+
+    return styleTemplateId ? [styleTemplateId] : [];
+  }
+
+  private resolveBackend(
+    backend: EditorRequest["renderBackend"],
+  ): "supabase" | "s3" {
+    return backend === "local" ? "supabase" : backend;
+  }
+
+  private async uploadWithRetry(
+    file: Buffer,
+    backend: EditorRequest["renderBackend"],
+    scriptId: string,
+  ): Promise<string> {
+    const maxAttempts = 3;
+    const baseDelayMs = 500;
+    let attempt = 0;
+
+    while (attempt < maxAttempts) {
+      try {
+        return await storageUploader(file, this.resolveBackend(backend));
+      } catch (error) {
+        attempt += 1;
+        const message = error instanceof Error ? error.message : String(error);
+
+        if (attempt >= maxAttempts) {
+          throw new Error(`Upload failed after ${attempt} attempts: ${message}`);
+        }
+
+        await this.logEvent("system.retry", {
+          scriptId,
+          backend,
+          attempt,
+          message,
+        });
+
+        const delay = baseDelayMs * 2 ** (attempt - 1);
+        await this.sleep(delay);
+      }
+    }
+
+    throw new Error("Upload retry logic exhausted unexpectedly");
   }
 }
 

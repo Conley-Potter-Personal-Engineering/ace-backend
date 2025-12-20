@@ -1,20 +1,17 @@
 import type { User } from "@supabase/supabase-js";
-import { getSupabase } from "../../db/supabase";
-import { logSystemEvent } from "../../repos/systemEvents";
-import type { Json } from "../../db/types";
-import { loginRequestSchema, type LoginRequest } from "../../schemas/apiSchemas";
+import type { NextApiRequest, NextApiResponse } from "next";
 
-interface LoginSuccess {
-  success: true;
-  data: { token: string; user: User };
-}
+import { getSupabase } from "@/db/supabase";
+import type { Json } from "@/db/types";
+import { logSystemEvent } from "@/repos/systemEvents";
+import { loginRequestSchema, type LoginRequest } from "@/schemas/apiSchemas";
 
-interface LoginFailure {
-  success: false;
-  error: string;
-}
-
-type LoginResponse = LoginSuccess | LoginFailure;
+type LoginResponse =
+  | {
+      success: true;
+      data: { token: string; user: User };
+    }
+  | { success: false; error: string };
 
 const logAuthEvent = async (
   eventType: string,
@@ -32,11 +29,23 @@ const logAuthEvent = async (
   }
 };
 
-export const login = async (rawBody: unknown): Promise<LoginResponse> => {
-  const supabase = getSupabase();
-  const credentials: LoginRequest = loginRequestSchema.parse(rawBody ?? {});
+export const authLoginHandler = async (
+  req: NextApiRequest,
+  res: NextApiResponse<LoginResponse>,
+) => {
+  let credentials: LoginRequest;
+  try {
+    credentials = loginRequestSchema.parse(req.body ?? {});
+  } catch (err) {
+    const message =
+      err instanceof Error ? err.message : "Invalid login payload";
+    await logAuthEvent("auth.login.error", { message });
+    console.error("Auth login validation failed", err);
+    return res.status(400).json({ success: false, error: message });
+  }
 
   await logAuthEvent("auth.login.start", { email: credentials.email });
+  const supabase = getSupabase();
 
   try {
     const { data, error } = await supabase.auth.signInWithPassword({
@@ -51,7 +60,7 @@ export const login = async (rawBody: unknown): Promise<LoginResponse> => {
         message,
       });
       console.error("Auth login failed", error);
-      return { success: false, error: message };
+      return res.status(400).json({ success: false, error: message });
     }
 
     const token = data.session.access_token;
@@ -60,7 +69,9 @@ export const login = async (rawBody: unknown): Promise<LoginResponse> => {
       userId: data.user.id,
     });
 
-    return { success: true, data: { token, user: data.user } };
+    return res
+      .status(200)
+      .json({ success: true, data: { token, user: data.user } });
   } catch (err) {
     const message =
       err instanceof Error ? err.message : "Unexpected login error";
@@ -69,8 +80,8 @@ export const login = async (rawBody: unknown): Promise<LoginResponse> => {
       message,
     });
     console.error("Auth login unexpected error", err);
-    return { success: false, error: message };
+    return res.status(500).json({ success: false, error: message });
   }
 };
 
-export default login;
+export default authLoginHandler;

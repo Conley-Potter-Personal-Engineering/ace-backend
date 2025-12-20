@@ -1,98 +1,361 @@
 import { randomUUID } from "crypto";
-import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
-import { ScriptwriterAgent } from "../../../src/agents/ScriptwriterAgent";
-import {
-  createProduct,
-  deleteAgentNote,
-  deleteProduct,
-  deleteScript,
-  getProductById,
-  getScriptById,
-  listEventsForAgent,
-  listNotesForAgent,
-} from "../../../src/repos";
-import * as scriptwriterService from "../../../src/services/scriptwriterService";
-import { integrationEnv } from "../setup";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { ScriptwriterAgent } from "@/agents/ScriptwriterAgent";
+import * as agentNotesRepo from "@/repos/agentNotes";
+import * as productsRepo from "@/repos/products";
+import * as scriptsRepo from "@/repos/scripts";
+import { ScriptWriterInput, ScriptOutput } from "@/schemas/scriptwriterSchemas";
+import { scriptInsertSchema } from "@/schemas/scriptsSchema";
+import * as scriptwriterChainModule from "@/llm/chains/scriptwriterChain";
 
-const shouldRunIntegration = integrationEnv.hasSupabaseCredentials;
+type TableName =
+  | "products"
+  | "scripts"
+  | "system_events"
+  | "agent_notes"
+  | "creative_patterns"
+  | "trend_snapshots";
 
-const describeIf = shouldRunIntegration ? describe : describe.skip;
+type Row = Record<string, any>;
 
-const agentName = "ScriptwriterAgentTest";
+function createInMemorySupabase() {
+  const db: Record<TableName, Row[]> = {
+    products: [],
+    scripts: [],
+    system_events: [],
+    agent_notes: [],
+    creative_patterns: [],
+    trend_snapshots: [],
+  };
 
-const createTestProduct = async () => {
-  const now = new Date().toISOString();
+  const buildQuery = (table: TableName) => {
+    const filters: Array<(row: Row) => boolean> = [];
+    let orderSpec: { column: string; ascending: boolean } | null = null;
+    let responseData: Row[] = [];
+    let hasExplicitResponse = false;
 
-  return createProduct({
-    product_id: randomUUID(),
-    name: `Integration Product ${now}`,
-    description: "Integration test product",
-    source_platform: "integration",
-    category: "testing",
-    created_at: now,
-    updated_at: now,
-    affiliate_link: null,
-    image_url: null,
-    meta: null,
+    const applyFilters = () => {
+      const base = db[table];
+      const filtered = filters.length
+        ? base.filter((row) => filters.every((fn) => fn(row)))
+        : [...base];
+
+      if (orderSpec) {
+        filtered.sort((a, b) => {
+          const aVal = a[orderSpec.column];
+          const bVal = b[orderSpec.column];
+          if (aVal === bVal) return 0;
+          return orderSpec.ascending
+            ? aVal > bVal
+              ? 1
+              : -1
+            : aVal < bVal
+            ? 1
+            : -1;
+        });
+      }
+
+      return filtered;
+    };
+
+    const response = {
+      insert: (payload: Row | Row[]) => {
+        const rows = Array.isArray(payload) ? payload : [payload];
+        const now = new Date().toISOString();
+        const inserted = rows.map((row) => {
+          const record = { ...row };
+          if (table === "scripts" && !record.script_id) {
+            record.script_id = randomUUID();
+          }
+          if (table === "products" && !record.product_id) {
+            record.product_id = randomUUID();
+          }
+          if ("created_at" in record && !record.created_at) {
+            record.created_at = now;
+          }
+          db[table].push(record);
+          return record;
+        });
+        responseData = inserted;
+        hasExplicitResponse = true;
+        return response;
+      },
+      select: () => {
+        hasExplicitResponse = false;
+        return response;
+      },
+      update: (changes: Row) => {
+        const updated: Row[] = [];
+        db[table] = db[table].map((row) => {
+          if (!filters.length || filters.every((fn) => fn(row))) {
+            const newRow = { ...row, ...changes };
+            updated.push(newRow);
+            return newRow;
+          }
+          return row;
+        });
+        responseData = updated;
+        hasExplicitResponse = true;
+        return response;
+      },
+      delete: () => {
+        const removed = db[table].filter(
+          (row) => filters.length && filters.every((fn) => fn(row)),
+        );
+        db[table] = db[table].filter(
+          (row) => !(filters.length && filters.every((fn) => fn(row))),
+        );
+        responseData = removed;
+        hasExplicitResponse = true;
+        return response;
+      },
+      eq: (column: string, value: unknown) => {
+        filters.push((row) => row[column] === value);
+        return response;
+      },
+      order: (column: string, options?: { ascending?: boolean }) => {
+        orderSpec = { column, ascending: options?.ascending ?? true };
+        return response;
+      },
+      limit: (limit: number) => {
+        responseData = responseData.slice(0, limit);
+        hasExplicitResponse = true;
+        return response;
+      },
+      ilike: () => response,
+      returns: () => response,
+      single: async () => ({
+        data: (hasExplicitResponse ? responseData : applyFilters())[0] ?? null,
+        error: null,
+      }),
+      maybeSingle: async () => ({
+        data: (hasExplicitResponse ? responseData : applyFilters())[0] ?? null,
+        error: null,
+      }),
+      then: (onFulfilled: (value: { data: Row[]; error: null }) => unknown) =>
+        Promise.resolve({
+          data: hasExplicitResponse ? responseData : applyFilters(),
+          error: null,
+        }).then(onFulfilled),
+      catch: (
+        onRejected: (reason?: unknown) => unknown,
+      ): Promise<unknown> => Promise.resolve({ data: null, error: null }).catch(onRejected),
+      finally: (onFinally?: (() => void) | null | undefined) =>
+        Promise.resolve().finally(onFinally),
+    };
+
+    return response;
+  };
+
+  const getSupabase = () => ({
+    from: (table: TableName) => buildQuery(table),
   });
+
+  const reset = () => {
+    (Object.keys(db) as TableName[]).forEach((key) => {
+      db[key] = [];
+    });
+  };
+
+  return { getSupabase, db, reset };
+}
+
+const mockDb = vi.hoisted(() => createInMemorySupabase());
+
+vi.mock("@/db/db", () => ({
+  getSupabase: mockDb.getSupabase,
+}));
+
+const describeIf = describe;
+
+const clearTablesForAgent = (agentName: string, productId?: string) => {
+  mockDb.db.system_events = mockDb.db.system_events.filter(
+    (event) => event.agent_name !== agentName,
+  );
+  mockDb.db.agent_notes = mockDb.db.agent_notes.filter(
+    (note) => note.agent_name !== agentName,
+  );
+
+  if (productId) {
+    mockDb.db.scripts = mockDb.db.scripts.filter(
+      (script) => script.product_id !== productId,
+    );
+    mockDb.db.products = mockDb.db.products.filter(
+      (product) => product.product_id !== productId,
+    );
+  }
 };
 
 describeIf("ScriptwriterAgent integration", () => {
+  const baseAgentName = "ScriptwriterAgentIntegration";
+  let agentName: string;
   let productId: string;
-  let scriptId: string | undefined;
-  let noteId: string | undefined;
 
-  beforeAll(() => {
-    if (!shouldRunIntegration && !integrationEnv.hasSupabaseCredentials) {
-      console.warn("Skipping ScriptwriterAgent integration tests due to missing Supabase credentials.");
-    }
+  beforeEach(async () => {
+    agentName = `${baseAgentName}-${randomUUID()}`;
+    productId = randomUUID();
+    mockDb.reset();
+    clearTablesForAgent(agentName, productId);
+    vi.restoreAllMocks();
   });
 
-  afterAll(async () => {
-    if (scriptId) {
-      await deleteScript(scriptId);
-    }
-    if (noteId) {
-      await deleteAgentNote(noteId);
-    }
-    if (productId) {
-      await deleteProduct(productId);
-    }
+  afterEach(async () => {
+    clearTablesForAgent(agentName, productId);
+    vi.restoreAllMocks();
   });
 
-  it("creates scripts and system events end-to-end", async () => {
-    const product = await createTestProduct();
-    productId = product.product_id;
+  it("persists script, note, and ordered events on success", async () => {
+    const structuredScript = ScriptOutput.parse({
+      title: "Integration Title",
+      hook: "Integration Hook",
+      cta: "Integration CTA",
+      outline: ["Beat one", "Beat two"],
+      body: "Full integration body.",
+    });
 
-    vi.spyOn(scriptwriterService, "generateScript").mockResolvedValue({
+    const chainSpy = vi
+      .spyOn(scriptwriterChainModule, "scriptwriterChain")
+      .mockResolvedValue(structuredScript);
+
+    const product = await productsRepo.createProduct({
+      product_id: productId,
+      name: "Integration Product",
+      description: "Integration product description",
+      source_platform: "integration",
+      category: "testing",
+      created_at: new Date().toISOString(),
+      updated_at: new Date().toISOString(),
+      affiliate_link: null,
+      image_url: null,
+      meta: null,
+    });
+
+    mockDb.db.creative_patterns.push({
+      pattern_id: "pattern-1",
+      product_id: productId,
+      structure: "Story arc",
+      style_tags: ["casual"],
+      emotion_tags: ["bold"],
+      hook_text: "Lead with surprise",
+      created_at: new Date().toISOString(),
+      updated_at: null,
+      description: "A reusable pattern",
+      name: "Pattern One",
+      meta: null,
+      source_platform: "integration",
+    });
+
+    mockDb.db.trend_snapshots.push({
+      snapshot_id: "trend-1",
+      product_id: productId,
+      tiktok_trend_tags: ["tag-a", "tag-b"],
+      velocity_score: 0.9,
+      popularity_score: 0.8,
+      created_at: new Date().toISOString(),
+      captured_at: new Date().toISOString(),
+      meta: null,
+    });
+
+    const input = ScriptWriterInput.parse({
       productId,
-      scriptText: "Integration test script body",
-      hook: "Integration hook",
-      creativeVariables: {
-        emotion: "focused",
-        structure: "problem-solution",
-        style: "direct",
-      },
+      productSummary: product.description,
+      trendSummaries: ["Trending summary"],
+      patternSummaries: ["Pattern summary"],
+      creativeVariables: { tone: "witty" },
     });
 
     const agent = new ScriptwriterAgent({ agentName });
-    const result = (await agent.execute({ productId })) as any;
+    const result = await agent.run(input);
 
-    scriptId = result?.scriptId;
-    expect(result?.script.product_id).toBe(productId);
+    expect(chainSpy).toHaveBeenCalledWith({
+      productId,
+      productSummary: product.description,
+      trendSummaries: ["Trending summary"],
+      patternSummaries: ["Pattern summary"],
+      creativeVariables: { tone: "witty" },
+    });
 
-    const storedScript = await getScriptById(result.scriptId);
-    expect(storedScript?.hook).toBe("Integration hook");
+    const storedScript = await scriptsRepo.getScriptById(result.scriptId);
+    expect(storedScript).toBeTruthy();
+    expect(storedScript?.product_id).toBe(productId);
+    expect(storedScript?.hook).toBe(structuredScript.hook);
+    expect(storedScript?.script_text).toContain(structuredScript.body);
+    scriptInsertSchema.parse({
+      scriptId: storedScript?.script_id,
+      productId: storedScript?.product_id,
+      scriptText: storedScript?.script_text,
+      hook: storedScript?.hook,
+      creativeVariables: storedScript?.creative_variables,
+      createdAt: storedScript?.created_at,
+    });
 
-    const notes = await listNotesForAgent(agentName);
-    noteId = notes.find((note) => note.topic === "script_generation")?.note_id;
-    expect(notes.length).toBeGreaterThan(0);
+    const notes = await agentNotesRepo.listNotesForAgent(agentName);
+    expect(notes.some((note) => note.topic === "script_generation")).toBe(true);
 
-    const events = await listEventsForAgent(agentName);
-    const eventTypes = events.map((event) => event.event_type);
-    expect(eventTypes).toContain("script.generate.success");
+    const eventTypes = mockDb.db.system_events
+      .filter((event) => event.agent_name === agentName)
+      .sort(
+        (a, b) =>
+          new Date(a.created_at).getTime() - new Date(b.created_at).getTime(),
+      )
+      .map((event) => event.event_type);
+    expect(eventTypes).toEqual([
+      "agent.start",
+      "script.generate.start",
+      "script.generate.success",
+      "agent.success",
+    ]);
 
-    const refreshedProduct = await getProductById(productId);
-    expect(refreshedProduct?.product_id).toBe(productId);
+    expect(result.script.product_id).toBe(productId);
+    expect(result.scriptId).toBeDefined();
+  });
+
+  it("logs error events when the chain fails", async () => {
+    vi.spyOn(scriptwriterChainModule, "scriptwriterChain").mockRejectedValueOnce(
+      new Error("Chain failure"),
+    );
+
+    await productsRepo.createProduct({
+      product_id: productId,
+      name: "Integration Product",
+      description: "Integration product description",
+      source_platform: "integration",
+      category: "testing",
+      created_at: new Date().toISOString(),
+      updated_at: new Date().toISOString(),
+      affiliate_link: null,
+      image_url: null,
+      meta: null,
+    });
+
+    const input = ScriptWriterInput.parse({
+      productId,
+      productSummary: "Integration product description",
+      trendSummaries: [],
+      patternSummaries: [],
+      creativeVariables: {},
+    });
+
+    const agent = new ScriptwriterAgent({ agentName });
+
+    await expect(agent.run(input)).rejects.toThrow("Chain failure");
+
+    const scripts = await scriptsRepo.listScriptsForProduct(productId);
+    expect(scripts).toHaveLength(0);
+
+    const eventTypes = mockDb.db.system_events
+      .filter((event) => event.agent_name === agentName)
+      .sort(
+        (a, b) =>
+          new Date(a.created_at).getTime() - new Date(b.created_at).getTime(),
+      )
+      .map((event) => event.event_type);
+    expect(eventTypes).toEqual([
+      "agent.start",
+      "script.generate.start",
+      "script.generate.error",
+      "agent.error",
+      "error",
+    ]);
   });
 });
