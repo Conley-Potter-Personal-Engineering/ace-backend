@@ -7,10 +7,11 @@ import {
   EditorRequestSchema,
   editorChainOutputSchema,
   type EditorRequest,
+  VideoAssetSchema,
   type VideoAsset,
 } from "@/schemas/editorSchemas";
 import { storageUploader } from "@/utils/storageUploader";
-import generateVideoFromPlan from "@/utils/videoGenerationHelper";
+import generateVideoWithVeo from "@/utils/veoVideoGenerator";
 import type { Tables } from "@/db/types";
 import BaseAgent from "./BaseAgent";
 
@@ -62,6 +63,7 @@ export class EditorAgent extends BaseAgent {
       const styleTags = this.deriveStyleTags(chainResult.styleTags, input.styleTemplateId);
       const renderPlan = {
         title: validatedChain.metadata.title,
+        scriptSummary: validatedChain.metadata.summary,
         tone: input.composition.tone,
         layout: input.composition.layout,
         duration: validatedChain.durationSeconds ?? input.composition.duration,
@@ -79,7 +81,7 @@ export class EditorAgent extends BaseAgent {
       });
 
       let videoBuffer: Buffer | null = null;
-      let generationMetadata: { duration: number; format: string; size: number } | null = null;
+      let generationMetadata: { duration?: number; format: string } | null = null;
 
       try {
         await this.logEvent("video.generate.start", {
@@ -88,14 +90,19 @@ export class EditorAgent extends BaseAgent {
           layout: renderPlan.layout,
         });
 
-        const generationResult = await generateVideoFromPlan(renderPlan);
+        const prompt = `Generate a ${renderPlan.duration}-second ${renderPlan.tone} video in ${renderPlan.layout} style about: ${
+          renderPlan.scriptSummary || renderPlan.title
+        }.`;
+        const generationResult = await generateVideoWithVeo(prompt, {
+          duration: renderPlan.duration,
+        });
         videoBuffer = generationResult.buffer;
         generationMetadata = generationResult.metadata;
 
         await this.logEvent("video.generate.success", {
           scriptId: input.scriptId,
           duration: generationMetadata.duration,
-          size: generationMetadata.size,
+          size: generationResult.buffer.length,
           format: generationMetadata.format,
         });
       } catch (generationError) {
@@ -123,14 +130,16 @@ export class EditorAgent extends BaseAgent {
         input.scriptId,
       );
 
-      const { asset, record } = await video_assetsRepo.create({
+      const assetPayload = VideoAssetSchema.parse({
         scriptId: input.scriptId,
         storageUrl,
-        duration: generationMetadata.duration,
+        duration: generationMetadata.duration ?? renderPlan.duration,
         tone: renderPlan.tone,
         layout: renderPlan.layout,
         styleTags: renderPlan.styleTags,
       });
+
+      const { asset, record } = await video_assetsRepo.create(assetPayload);
 
       await this.logEvent("video.assets.uploaded", {
         scriptId: input.scriptId,
