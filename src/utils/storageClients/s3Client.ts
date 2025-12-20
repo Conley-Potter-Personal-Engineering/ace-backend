@@ -1,46 +1,65 @@
+/**
+ * S3 client for ACE
+ *
+ * ✅ Uses AWS SDK v3 modular import (`@aws-sdk/client-s3`)
+ * ✅ Lazily initializes the client to avoid Turbopack build-time env freezing
+ * ✅ Provides a helper for uploading files at runtime
+ */
+
 import { PutObjectCommand, S3Client } from "@aws-sdk/client-s3";
 
-const { AWS_S3_BUCKET_NAME, AWS_ACCESS_KEY_ID, AWS_SECRET_ACCESS_KEY, AWS_S3_REGION } =
-  process.env;
-
-if (!AWS_S3_BUCKET_NAME || !AWS_ACCESS_KEY_ID || !AWS_SECRET_ACCESS_KEY || !AWS_S3_REGION) {
-  throw new Error("S3 environment variables are missing");
-}
-
-const s3Client = new S3Client({
-  region: AWS_S3_REGION,
-  credentials: {
-    accessKeyId: AWS_ACCESS_KEY_ID,
-    secretAccessKey: AWS_SECRET_ACCESS_KEY,
-  },
-});
-
-const DEFAULT_KEY_PREFIX = "videos";
+let s3Client: S3Client | null = null;
 
 /**
- * Uploads a file buffer to S3 and returns a public URL.
- * Uses `videos/<timestamp>.mp4` as the default object key when none is provided.
- * Uploads with `public-read` ACL to ensure accessibility.
- * Throws descriptive errors when upload fails.
+ * Lazily initializes the S3 client using runtime environment variables.
  */
-export const uploadToS3 = async (
-  file: Buffer,
-  key: string = `${DEFAULT_KEY_PREFIX}/${Date.now()}.mp4`,
-): Promise<string> => {
-  try {
-    const command = new PutObjectCommand({
-      Bucket: AWS_S3_BUCKET_NAME,
-      Key: key,
-      Body: file,
-      ACL: "public-read",
-      ContentType: "video/mp4",
+export function getS3Client(): S3Client {
+  if (!s3Client) {
+    const region = process.env.AWS_REGION;
+    const accessKeyId = process.env.AWS_ACCESS_KEY_ID;
+    const secretAccessKey = process.env.AWS_SECRET_ACCESS_KEY;
+    const bucket = process.env.AWS_S3_BUCKET;
+
+    if (!region || !accessKeyId || !secretAccessKey || !bucket) {
+      throw new Error("S3 environment variables are missing");
+    }
+
+    s3Client = new S3Client({
+      region,
+      credentials: {
+        accessKeyId,
+        secretAccessKey,
+      },
     });
-
-    await s3Client.send(command);
-
-    return `https://${AWS_S3_BUCKET_NAME}.s3.${AWS_S3_REGION}.amazonaws.com/${key}`;
-  } catch (error) {
-    const message = error instanceof Error ? error.message : String(error);
-    throw new Error(`S3 upload error: ${message}`);
   }
-};
+
+  return s3Client;
+}
+
+/**
+ * Uploads a file to the configured S3 bucket.
+ * Automatically retrieves the client at runtime.
+ */
+export async function uploadToS3(
+  key: string,
+  body: Buffer | Uint8Array | Blob | string,
+  contentType?: string
+): Promise<string> {
+  const client = getS3Client();
+  const bucket = process.env.AWS_S3_BUCKET;
+
+  if (!bucket) {
+    throw new Error("AWS_S3_BUCKET is not defined in environment");
+  }
+
+  const command = new PutObjectCommand({
+    Bucket: bucket,
+    Key: key,
+    Body: body,
+    ContentType: contentType || "application/octet-stream",
+  });
+
+  await client.send(command);
+
+  return `https://${bucket}.s3.${process.env.AWS_REGION}.amazonaws.com/${key}`;
+}
