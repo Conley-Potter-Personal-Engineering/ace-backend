@@ -1,40 +1,15 @@
 import { describe, expect, it, vi } from "vitest";
-import { EditorAgent } from "../../../src/agents/EditorAgent";
-import { buildAgentNote } from "../../utils/factories/agentNoteFactory";
 import { buildScript } from "../../utils/factories/scriptFactory";
 
-vi.mock("../../../src/repos/systemEvents", () => ({
-  logSystemEvent: vi.fn(async ({ event_type }) => ({
-    event_id: "event-id",
-    agent_name: "EditorAgent",
-    event_type,
-    payload: null,
-    created_at: new Date().toISOString(),
-  })),
-}));
-
-const mockNote = buildAgentNote({ agent_name: "EditorAgent" });
 const mockScript = buildScript();
-const mockAsset = {
-  asset_id: "asset-id",
-  created_at: new Date().toISOString(),
-  duration_seconds: 42,
-  script_id: mockScript.script_id,
-  storage_path: "videos/rendered/asset-id.mp4",
-  thumbnail_path: "videos/thumbnails/asset-id.jpg",
-};
+const mockVideoBuffer = Buffer.from("fakeVideo");
+const mockStorageUrl = "https://mock.storage/video.mp4";
 
-vi.mock("../../../src/repos/agentNotes", () => ({
-  createAgentNote: vi.fn(async () => mockNote),
-}));
-
-vi.mock("../../../src/repos", () => ({
-  getScriptById: vi.fn(async () => mockScript),
-}));
-
-vi.mock("../../../src/services/editorService", () => ({
-  renderVideoAsset: vi.fn(async () => ({
-    asset: mockAsset,
+vi.mock("../../../src/llm/chains/editorChain", () => ({
+  default: vi.fn(async () => ({
+    storagePath: "videos/rendered/mock.mp4",
+    thumbnailPath: "videos/rendered/mock.jpg",
+    durationSeconds: 42,
     metadata: {
       title: "Edited Video",
       summary: "A concise short-form cut",
@@ -48,38 +23,108 @@ vi.mock("../../../src/services/editorService", () => ({
       soundtrack: "Energetic backing track",
       transitions: "Quick cuts",
     },
+    styleTags: ["cinematic"],
+    mockVideo: "mockVideo",
+  })),
+}));
+
+const generateVideoWithVeoMock = vi.fn(async () => ({
+  buffer: mockVideoBuffer,
+  metadata: { duration: 42, format: "mp4" },
+}));
+
+vi.mock("../../../src/utils/veoVideoGenerator", () => ({
+  generateVideoWithVeo: generateVideoWithVeoMock,
+  default: generateVideoWithVeoMock,
+}));
+
+vi.mock("../../../src/utils/storageUploader", () => ({
+  storageUploader: vi.fn(async () => mockStorageUrl),
+}));
+
+vi.mock("../../../src/repos/scripts", () => ({
+  findById: vi.fn(async () => mockScript),
+}));
+
+vi.mock("../../../src/repos/videoAssets", () => ({
+  create: vi.fn(async (payload) => ({
+    asset: {
+      ...payload,
+      id: "asset-id",
+      styleTags: payload.styleTags ?? [],
+    },
+    record: {
+      asset_id: "asset-id",
+      script_id: payload.scriptId,
+      storage_path: payload.storageUrl,
+      duration_seconds: payload.duration,
+      thumbnail_path: null,
+      created_at: new Date().toISOString(),
+    },
+  })),
+}));
+
+vi.mock("../../../src/repos/systemEvents", () => ({
+  logSystemEvent: vi.fn(async ({ event_type, agent_name, payload, created_at }) => ({
+    event_id: "event-id",
+    agent_name: agent_name ?? "EditorAgent",
+    event_type,
+    payload: payload ?? null,
+    created_at: created_at ?? new Date().toISOString(),
   })),
 }));
 
 const { logSystemEvent } = await import("../../../src/repos/systemEvents");
-const { getScriptById } = await import("../../../src/repos");
-const { renderVideoAsset } = await import("../../../src/services/editorService");
+const { generateVideoWithVeo } = await import("../../../src/utils/veoVideoGenerator");
+const { storageUploader } = await import("../../../src/utils/storageUploader");
+const { create: createVideoAsset } = await import("../../../src/repos/videoAssets");
+const { EditorAgent } = await import("../../../src/agents/EditorAgent");
 
 describe("EditorAgent", () => {
-  it("renders a video asset from a script and logs workflow events", async () => {
+  it("renders a video asset from a script using VEO and logs workflow events", async () => {
     const agentName = "EditorAgentTest";
     const agent = new EditorAgent({ agentName });
 
-    const result = await agent.execute({
+    const result = await agent.run({
       scriptId: mockScript.script_id,
-      overrideStoragePath: "videos/custom-path.mp4",
+      composition: {
+        duration: 42,
+        tone: "energetic",
+        layout: "montage",
+      },
+      renderBackend: "supabase",
     });
 
-    expect(getScriptById).toHaveBeenCalledWith(mockScript.script_id);
-    expect(renderVideoAsset).toHaveBeenCalledWith({
-      script: mockScript,
-      overrideStoragePath: "videos/custom-path.mp4",
+    const expectedPrompt =
+      "Generate a 42-second energetic video in montage style about: A concise short-form cut.";
+
+    expect(generateVideoWithVeo).toHaveBeenCalledWith(expectedPrompt, {
+      duration: 42,
     });
+    expect(storageUploader).toHaveBeenCalledWith(mockVideoBuffer, "supabase");
+    expect(createVideoAsset).toHaveBeenCalledWith(
+      expect.objectContaining({
+        scriptId: mockScript.script_id,
+        storageUrl: mockStorageUrl,
+        duration: 42,
+        tone: "energetic",
+        layout: "montage",
+        styleTags: ["cinematic"],
+      }),
+    );
 
     const loggedEvents = vi.mocked(logSystemEvent).mock.calls.map(
       ([payload]) => payload.event_type,
     );
-    expect(loggedEvents).toContain("start");
+    expect(loggedEvents).toContain("agent.start");
     expect(loggedEvents).toContain("video.render.start");
     expect(loggedEvents).toContain("video.render.success");
+    expect(loggedEvents).toContain("video.generate.start");
+    expect(loggedEvents).toContain("video.generate.success");
+    expect(loggedEvents).toContain("agent.success");
 
-    const typedResult = result as { assetId: string; asset: typeof mockAsset };
-    expect(typedResult.assetId).toBe(mockAsset.asset_id);
-    expect(typedResult.asset).toEqual(mockAsset);
+    expect(result.storageUrl).toBe(mockStorageUrl);
+    expect(result.asset.styleTags).toEqual(["cinematic"]);
+    expect(result.asset.tone).toBe("energetic");
   });
 });
