@@ -114,6 +114,8 @@ export const triggerAgentRun = async (
     throw new Error(`Agent ${validatedName} is not registered`);
   }
 
+  console.log("Raw body:", rawBody);
+
   const parsedBody = agentRunRequestSchema.parse(rawBody ?? {});
   const parsedInput = agent.inputSchema.parse(parsedBody.input ?? {});
   const startedAt = new Date().toISOString();
