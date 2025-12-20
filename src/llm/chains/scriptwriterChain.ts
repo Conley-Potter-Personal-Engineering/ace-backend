@@ -1,7 +1,7 @@
 import { ScriptWriterInput, ScriptOutput, type ScriptOutputType, type ScriptWriterInputType } from "@/schemas/scriptwriterSchemas";
 import { createScriptwriterModel } from "../models/openaiModel";
 
-const scriptwriterModel = createScriptwriterModel(0.8);
+const scriptwriterModel = createScriptwriterModel();
 
 const toBulletList = (items: string[], fallback: string): string =>
   items.length ? items.map((item) => `- ${item}`).join("\n") : `- ${fallback}`;
