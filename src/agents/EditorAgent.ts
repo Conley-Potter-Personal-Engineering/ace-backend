@@ -10,6 +10,7 @@ import {
   type VideoAsset,
 } from "@/schemas/editorSchemas";
 import { storageUploader } from "@/utils/storageUploader";
+import generateVideoFromPlan from "@/utils/videoGenerationHelper";
 import type { Tables } from "@/db/types";
 import BaseAgent from "./BaseAgent";
 
@@ -28,6 +29,9 @@ export class EditorAgent extends BaseAgent {
   async run(rawInput: unknown): Promise<EditorAgentResult> {
     await this.logEvent("agent.start", { input: rawInput });
     await this.logEvent("video.render.start", { input: rawInput });
+
+    let renderPlanPrepared = false;
+    let agentErrorLogged = false;
 
     try {
       const input = EditorRequestSchema.parse(rawInput);
@@ -55,31 +59,77 @@ export class EditorAgent extends BaseAgent {
         metadata: chainResult.metadata,
       });
 
-      const mockVideo =
-        chainResult.mockVideo ??
-        JSON.stringify({
+      const styleTags = this.deriveStyleTags(chainResult.styleTags, input.styleTemplateId);
+      const renderPlan = {
+        title: validatedChain.metadata.title,
+        tone: input.composition.tone,
+        layout: input.composition.layout,
+        duration: validatedChain.durationSeconds ?? input.composition.duration,
+        styleTags,
+      };
+
+      renderPlanPrepared = true;
+
+      await this.logEvent("video.render.success", {
+        scriptId: input.scriptId,
+        storagePath: validatedChain.storagePath,
+        duration: renderPlan.duration,
+        styleTags,
+        metadata: validatedChain.metadata,
+      });
+
+      let videoBuffer: Buffer | null = null;
+      let generationMetadata: { duration: number; format: string; size: number } | null = null;
+
+      try {
+        await this.logEvent("video.generate.start", {
           scriptId: input.scriptId,
-          composition: input.composition,
-          metadata: validatedChain.metadata,
+          tone: renderPlan.tone,
+          layout: renderPlan.layout,
         });
 
+        const generationResult = await generateVideoFromPlan(renderPlan);
+        videoBuffer = generationResult.buffer;
+        generationMetadata = generationResult.metadata;
+
+        await this.logEvent("video.generate.success", {
+          scriptId: input.scriptId,
+          duration: generationMetadata.duration,
+          size: generationMetadata.size,
+          format: generationMetadata.format,
+        });
+      } catch (generationError) {
+        const message =
+          generationError instanceof Error ? generationError.message : String(generationError);
+        await this.logEvent("video.generate.error", {
+          scriptId: input.scriptId,
+          message,
+        });
+        await this.logEvent("agent.error", {
+          scriptId: input.scriptId,
+          message,
+        });
+        agentErrorLogged = true;
+        throw generationError;
+      }
+
+      if (!videoBuffer || !generationMetadata) {
+        throw new Error("Video generation failed: Missing video buffer or metadata");
+      }
+
       const storageUrl = await this.uploadWithRetry(
-        Buffer.from(mockVideo),
+        videoBuffer,
         input.renderBackend,
         input.scriptId,
       );
 
-      const styleTags = this.deriveStyleTags(chainResult.styleTags, input.styleTemplateId);
-
       const { asset, record } = await video_assetsRepo.create({
         scriptId: input.scriptId,
         storageUrl,
-        duration: Math.round(
-          validatedChain.durationSeconds ?? input.composition.duration,
-        ),
-        tone: input.composition.tone,
-        layout: input.composition.layout,
-        styleTags,
+        duration: generationMetadata.duration,
+        tone: renderPlan.tone,
+        layout: renderPlan.layout,
+        styleTags: renderPlan.styleTags,
       });
 
       await this.logEvent("video.assets.uploaded", {
@@ -95,13 +145,6 @@ export class EditorAgent extends BaseAgent {
         durationSeconds: record.duration_seconds,
       });
 
-      await this.logEvent("video.render.success", {
-        scriptId: input.scriptId,
-        assetId: record.asset_id,
-        storageUrl,
-        styleTags,
-        duration: asset.duration,
-      });
       await this.logEvent("agent.success", {
         scriptId: input.scriptId,
         assetId: record.asset_id,
@@ -115,14 +158,21 @@ export class EditorAgent extends BaseAgent {
       };
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);
-      await this.logEvent("video.render.error", {
-        scriptId: (rawInput as Record<string, unknown> | null)?.scriptId ?? null,
-        message,
-      });
-      await this.logEvent("agent.error", {
-        scriptId: (rawInput as Record<string, unknown> | null)?.scriptId ?? null,
-        message,
-      });
+      const scriptId = (rawInput as Record<string, unknown> | null)?.scriptId ?? null;
+
+      if (!renderPlanPrepared) {
+        await this.logEvent("video.render.error", {
+          scriptId,
+          message,
+        });
+      }
+
+      if (!agentErrorLogged) {
+        await this.logEvent("agent.error", {
+          scriptId,
+          message,
+        });
+      }
       return this.handleError("EditorAgent.run", error);
     }
   }
