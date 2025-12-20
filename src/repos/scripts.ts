@@ -64,6 +64,8 @@ export const getScriptById = async (scriptId: string) => {
   return data;
 };
 
+export const findById = getScriptById;
+
 export const updateScript = async (
   scriptId: string,
   changes: TablesUpdate<"scripts">,

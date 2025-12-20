@@ -1,5 +1,6 @@
 import { getSupabase } from "../db/db";
 import type { Tables, TablesInsert, TablesUpdate } from "../db/types";
+import { VideoAssetSchema, type VideoAsset } from "../schemas/editorSchemas";
 import { identifierSchema, nullableDateSchema, z } from "./validators";
 
 const videoAssetInsertSchema = z.object({
@@ -14,6 +15,34 @@ const videoAssetInsertSchema = z.object({
 const videoAssetUpdateSchema = videoAssetInsertSchema.partial();
 
 const assetIdSchema = identifierSchema.describe("asset_id");
+
+export interface CreatedVideoAsset {
+  asset: VideoAsset;
+  record: Tables<"video_assets">;
+}
+
+export const create = async (
+  payload: Omit<VideoAsset, "id"> & { id?: string },
+): Promise<CreatedVideoAsset> => {
+  const validated = VideoAssetSchema.parse(payload);
+  const record = await createVideoAsset({
+    asset_id: validated.id,
+    script_id: validated.scriptId,
+    storage_path: validated.storageUrl,
+    duration_seconds: validated.duration,
+    thumbnail_path: null,
+    created_at: new Date().toISOString(),
+  });
+
+  const asset: VideoAsset = {
+    ...validated,
+    id: record.asset_id,
+    storageUrl: record.storage_path,
+    styleTags: validated.styleTags ?? [],
+  };
+
+  return { asset, record };
+};
 
 export const createVideoAsset = async (
   payload: TablesInsert<"video_assets">,
