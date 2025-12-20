@@ -45,7 +45,13 @@ export const authLoginHandler = async (
   }
 
   await logAuthEvent("auth.login.start", { email: credentials.email });
-  const supabase = getSupabase();
+  let supabase: ReturnType<typeof getSupabase>;
+  try {
+    supabase = getSupabase();
+  } catch (err) {
+    console.error("Supabase initialization failed:", err);
+    throw err;
+  }
 
   try {
     const { data, error } = await supabase.auth.signInWithPassword({

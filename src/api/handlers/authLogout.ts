@@ -29,7 +29,13 @@ export const authLogoutHandler = async (
   res: NextApiResponse<LogoutResponse>,
 ) => {
   await logAuthEvent("auth.logout.start");
-  const supabase = getSupabase();
+  let supabase: ReturnType<typeof getSupabase>;
+  try {
+    supabase = getSupabase();
+  } catch (err) {
+    console.error("Supabase initialization failed:", err);
+    throw err;
+  }
 
   try {
     const { error } = await supabase.auth.signOut();
