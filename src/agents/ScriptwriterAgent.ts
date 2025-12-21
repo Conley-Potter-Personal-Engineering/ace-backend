@@ -5,9 +5,9 @@ import * as creativePatternsRepo from "@/repos/creativePatterns";
 import * as productsRepo from "@/repos/products";
 import * as scriptsRepo from "@/repos/scripts";
 import * as trendSnapshotsRepo from "@/repos/trendSnapshots";
+import { scriptwriterAgentInputSchema } from "@/schemas/agentSchemas";
 import {
   ScriptOutput,
-  ScriptWriterInput,
   type ScriptOutputType,
   type ScriptWriterInputType,
 } from "@/schemas/scriptwriterSchemas";
@@ -67,25 +67,28 @@ export class ScriptwriterAgent extends BaseAgent {
     await this.logEvent("script.generate.start", { input: rawInput });
 
     try {
-      const input = ScriptWriterInput.parse(rawInput);
+      const input = scriptwriterAgentInputSchema.parse(rawInput);
 
       const product = await productsRepo.getProductById(input.productId);
       if (!product) {
         throw new Error(`Product ${input.productId} not found`);
       }
 
-      const [creativePatterns, trendSnapshots] = await Promise.all([
-        creativePatternsRepo.listPatternsForProduct(input.productId),
+      const [creativePattern, trendSnapshots] = await Promise.all([
+        creativePatternsRepo.getCreativePatternById(input.creativePatternId),
         trendSnapshotsRepo.listSnapshotsForProduct(input.productId),
       ]);
 
-      const resolvedPatternSummaries = input.patternSummaries.length
-        ? input.patternSummaries
-        : creativePatterns.map(summarizePattern);
+      if (!creativePattern) {
+        throw new Error(`Creative pattern ${input.creativePatternId} not found`);
+      }
 
-      const resolvedTrendSummaries = input.trendSummaries.length
-        ? input.trendSummaries
-        : trendSnapshots.map(summarizeTrend);
+      const resolvedPatternSummary = summarizePattern(creativePattern);
+      const resolvedTrendSnapshots = input.trendSnapshotIds.length
+        ? trendSnapshots.filter((snapshot) =>
+            input.trendSnapshotIds.includes(snapshot.snapshot_id),
+          )
+        : trendSnapshots;
 
       const chainInput: ScriptWriterInputType = {
         productId: input.productId,
@@ -94,30 +97,21 @@ export class ScriptwriterAgent extends BaseAgent {
           product.description ||
           product.name ||
           "No product summary available.",
-        patternSummaries: resolvedPatternSummaries,
-        trendSummaries: resolvedTrendSummaries,
-        creativeVariables: input.creativeVariables ?? {},
+        creativePatternId: input.creativePatternId,
+        trendSummaries: resolvedTrendSnapshots.map(summarizeTrend),
       };
 
       const structuredScript = ScriptOutput.parse(await scriptwriterChain(chainInput));
 
-      const patternUsed = creativePatterns[0]?.pattern_id;
-      const trendReference = trendSnapshots[0]?.snapshot_id;
-
-      const creativeVariables = {
-        ...input.creativeVariables,
-        emotion: input.creativeVariables?.emotion ?? "inspiring",
-        structure: input.creativeVariables?.structure ?? "problem-solution",
-        style: input.creativeVariables?.style ?? "direct",
-        patternUsed,
-        trendReference,
-      };
+      const patternUsed = creativePattern.pattern_id;
+      const trendReference = resolvedTrendSnapshots[0]?.snapshot_id;
 
       const createdScript = await scriptsRepo.createScript({
         productId: input.productId,
         scriptText: formatScriptText(structuredScript),
         hook: structuredScript.hook,
-        creativeVariables,
+        creativePatternId: input.creativePatternId,
+        trendReference,
         createdAt: this.now(),
       });
 
@@ -126,8 +120,8 @@ export class ScriptwriterAgent extends BaseAgent {
         topic: "script_generation",
         content: [
           `Script generated for ${product.name ?? product.product_id}.`,
+          resolvedPatternSummary,
           `Pattern used: ${patternUsed ?? "none"}; Trend reference: ${trendReference ?? "none"}.`,
-          `Creative variables: ${JSON.stringify(creativeVariables)}`,
           `CTA: ${structuredScript.cta}`,
         ].join("\n"),
         importance: 0.6,

@@ -211,41 +211,117 @@ export type Database = {
           },
         ]
       }
+      product_creative_contexts: {
+        Row: {
+          created_at: string | null
+          id: string
+          pattern_id: string
+          product_id: string
+          snapshot_id: string
+        }
+        Insert: {
+          created_at?: string | null
+          id?: string
+          pattern_id: string
+          product_id: string
+          snapshot_id: string
+        }
+        Update: {
+          created_at?: string | null
+          id?: string
+          pattern_id?: string
+          product_id?: string
+          snapshot_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "product_creative_contexts_pattern_id_fkey"
+            columns: ["pattern_id"]
+            isOneToOne: false
+            referencedRelation: "creative_patterns"
+            referencedColumns: ["pattern_id"]
+          },
+          {
+            foreignKeyName: "product_creative_contexts_product_id_fkey"
+            columns: ["product_id"]
+            isOneToOne: false
+            referencedRelation: "products"
+            referencedColumns: ["product_id"]
+          },
+          {
+            foreignKeyName: "product_creative_contexts_snapshot_id_fkey"
+            columns: ["snapshot_id"]
+            isOneToOne: false
+            referencedRelation: "trend_snapshots"
+            referencedColumns: ["snapshot_id"]
+          },
+        ]
+      }
       products: {
         Row: {
           affiliate_link: string | null
+          brand: string | null
           category: string | null
+          content_brief: string | null
           created_at: string | null
+          currency: string
+          demo_ideas: Json
           description: string | null
           image_url: string | null
+          key_features: Json
           meta: Json | null
           name: string
+          objections: Json
+          price_usd: number | null
+          primary_benefit: string | null
           product_id: string
           source_platform: string
+          status: string
+          target_audience: string | null
           updated_at: string | null
         }
         Insert: {
           affiliate_link?: string | null
+          brand?: string | null
           category?: string | null
+          content_brief?: string | null
           created_at?: string | null
+          currency?: string
+          demo_ideas?: Json
           description?: string | null
           image_url?: string | null
+          key_features?: Json
           meta?: Json | null
           name: string
+          objections?: Json
+          price_usd?: number | null
+          primary_benefit?: string | null
           product_id?: string
           source_platform: string
+          status?: string
+          target_audience?: string | null
           updated_at?: string | null
         }
         Update: {
           affiliate_link?: string | null
+          brand?: string | null
           category?: string | null
+          content_brief?: string | null
           created_at?: string | null
+          currency?: string
+          demo_ideas?: Json
           description?: string | null
           image_url?: string | null
+          key_features?: Json
           meta?: Json | null
           name?: string
+          objections?: Json
+          price_usd?: number | null
+          primary_benefit?: string | null
           product_id?: string
           source_platform?: string
+          status?: string
+          target_audience?: string | null
           updated_at?: string | null
         }
         Relationships: []
@@ -339,29 +415,42 @@ export type Database = {
       scripts: {
         Row: {
           created_at: string | null
+          creative_pattern_id: string | null
           creative_variables: Json | null
           hook: string | null
           product_id: string | null
           script_id: string
           script_text: string
+          trend_reference: string | null
         }
         Insert: {
           created_at?: string | null
+          creative_pattern_id?: string | null
           creative_variables?: Json | null
           hook?: string | null
           product_id?: string | null
           script_id?: string
           script_text: string
+          trend_reference?: string | null
         }
         Update: {
           created_at?: string | null
+          creative_pattern_id?: string | null
           creative_variables?: Json | null
           hook?: string | null
           product_id?: string | null
           script_id?: string
           script_text?: string
+          trend_reference?: string | null
         }
         Relationships: [
+          {
+            foreignKeyName: "scripts_creative_pattern_id_fkey"
+            columns: ["creative_pattern_id"]
+            isOneToOne: false
+            referencedRelation: "creative_patterns"
+            referencedColumns: ["pattern_id"]
+          },
           {
             foreignKeyName: "scripts_product_id_fkey"
             columns: ["product_id"]
@@ -369,29 +458,42 @@ export type Database = {
             referencedRelation: "products"
             referencedColumns: ["product_id"]
           },
+          {
+            foreignKeyName: "scripts_trend_reference_fkey"
+            columns: ["trend_reference"]
+            isOneToOne: false
+            referencedRelation: "trend_snapshots"
+            referencedColumns: ["snapshot_id"]
+          },
         ]
       }
       system_events: {
         Row: {
           agent_name: string | null
+          correlation_id: string | null
           created_at: string | null
           event_id: string
           event_type: string
           payload: Json | null
+          workflow_id: string | null
         }
         Insert: {
           agent_name?: string | null
+          correlation_id?: string | null
           created_at?: string | null
           event_id?: string
           event_type: string
           payload?: Json | null
+          workflow_id?: string | null
         }
         Update: {
           agent_name?: string | null
+          correlation_id?: string | null
           created_at?: string | null
           event_id?: string
           event_type?: string
           payload?: Json | null
+          workflow_id?: string | null
         }
         Relationships: []
       }

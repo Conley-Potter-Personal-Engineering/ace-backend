@@ -8,11 +8,9 @@ export const buildScript = (
   product_id: randomUUID(),
   script_text: "Generated script body",
   hook: "Compelling hook",
-  creative_variables: {
-    emotion: "excited",
-    structure: "story",
-    style: "upbeat",
-  },
+  creative_pattern_id: randomUUID(),
+  trend_reference: randomUUID(),
+  creative_variables: null,
   created_at: new Date().toISOString(),
   ...overrides,
 });

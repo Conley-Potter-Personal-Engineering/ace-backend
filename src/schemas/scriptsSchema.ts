@@ -1,19 +1,18 @@
-import { jsonSchema, z } from "../repos/validators";
-
-const creativeVariablesSchema = z
-  .object({
-    emotion: z.string().trim().min(1, "Emotion is required"),
-    structure: z.string().trim().min(1, "Structure is required"),
-    style: z.string().trim().min(1, "Style is required"),
-  })
-  .catchall(jsonSchema);
+import { z } from "../repos/validators";
 
 export const scriptInsertSchema = z.object({
   scriptId: z.string().uuid().optional(),
   productId: z.string().uuid("Product ID must be a valid UUID"),
   scriptText: z.string().trim().min(1, "Script text is required"),
   hook: z.string().trim().min(1, "Hook is required"),
-  creativeVariables: creativeVariablesSchema,
+  creativePatternId: z
+    .string()
+    .uuid("Creative pattern ID must be a valid UUID"),
+  trendReference: z
+    .string()
+    .uuid("Trend reference must be a valid UUID")
+    .nullable()
+    .optional(),
   createdAt: z.string().datetime().nullable().optional(),
 });
 

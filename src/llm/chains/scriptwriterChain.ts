@@ -6,18 +6,6 @@ const scriptwriterModel = createScriptwriterModel();
 const toBulletList = (items: string[], fallback: string): string =>
   items.length ? items.map((item) => `- ${item}`).join("\n") : `- ${fallback}`;
 
-const formatCreativeVariables = (creativeVariables: Record<string, string>): string => {
-  const entries = Object.entries(creativeVariables).sort(([a], [b]) =>
-    a.localeCompare(b),
-  );
-
-  if (!entries.length) {
-    return "- None provided.";
-  }
-
-  return entries.map(([key, value]) => `- ${key}: ${value}`).join("\n");
-};
-
 const stripCodeFences = (raw: string): string => {
   const trimmed = raw.trim();
 
@@ -63,10 +51,7 @@ const extractContent = (modelResponse: unknown): string => {
 };
 
 const buildPrompt = (input: ScriptWriterInputType): string => {
-  const { productId, productSummary, trendSummaries, patternSummaries, creativeVariables } =
-    input;
-
-  const creativeVariablesBlock = formatCreativeVariables(creativeVariables ?? {});
+  const { productId, productSummary, creativePatternId, trendSummaries } = input;
 
   return [
     "You are the Autonomous Content Engine's (ACE) Scriptwriter v2. Create a concise, persuasive short-form video script grounded in the provided context.",
@@ -84,12 +69,8 @@ const buildPrompt = (input: ScriptWriterInputType): string => {
     ),
     `Product ID: ${productId}`,
     `Product Summary:\n${productSummary}`,
+    `Creative Pattern ID: ${creativePatternId}`,
     `Trend Summaries:\n${toBulletList(trendSummaries ?? [], "No trend summaries provided.")}`,
-    `Creative Pattern Summaries:\n${toBulletList(
-      patternSummaries ?? [],
-      "No creative patterns provided.",
-    )}`,
-    `Creative Variables:\n${creativeVariablesBlock}`,
     "Constraints:",
     "- Keep pacing tight for a 15-60 second short-form video.",
     "- Incorporate relevant trends and creative patterns naturally.",

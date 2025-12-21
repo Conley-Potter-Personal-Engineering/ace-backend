@@ -6,26 +6,17 @@ export const scriptwriterAgentInputSchema = z.object({
     .string()
     .trim()
     .min(1, "Product summary is required"),
+  creativePatternId: z.string().uuid("creativePatternId must be a valid UUID"),
   trendSnapshotIds: z.array(z.string().uuid()).optional().default([]),
-  patternIds: z.array(z.string().uuid()).optional().default([]),
-  creativeVariables: z
-    .object({
-      tone: z.string().optional(),
-      length: z.number().optional(),
-      cta: z.string().optional(),
-    })
-    .optional()
-    .default({}),
 });
 
 export type ScriptwriterAgentInput = z.infer<typeof scriptwriterAgentInputSchema>;
 
 export const ScriptWriterInput = z.object({
-  productId: z.string(),
+  productId: z.string().uuid("productId must be a valid UUID"),
   productSummary: z.string().trim().min(1, "Product summary is required"),
+  creativePatternId: z.string().uuid("creativePatternId must be a valid UUID"),
   trendSummaries: z.array(z.string().trim().min(1)).default([]),
-  patternSummaries: z.array(z.string().trim().min(1)).default([]),
-  creativeVariables: z.record(z.string().trim()).default({}),
 });
 
 export type ScriptWriterInputType = z.infer<typeof ScriptWriterInput>;
