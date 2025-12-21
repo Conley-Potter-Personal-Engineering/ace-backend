@@ -124,7 +124,7 @@ export class ScriptwriterAgent extends BaseAgent {
           `Pattern used: ${patternUsed ?? "none"}; Trend reference: ${trendReference ?? "none"}.`,
           `CTA: ${structuredScript.cta}`,
         ].join("\n"),
-        importance: 0.6,
+        importance: 3,
         embedding: null,
         created_at: this.now(),
       });
