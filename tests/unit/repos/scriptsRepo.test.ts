@@ -27,10 +27,13 @@ describe("scriptsRepo.createScript", () => {
   });
 
   it("persists a script and returns the created row", async () => {
+    const creativePatternId = "6d2b9f7a-cb5f-4d83-a5f9-1af711a7d1cc";
+    const trendReference = "a8153c1b-5d1a-4e12-9d2c-00fa4a54b5f8";
     const script = buildScript({
       script_text: "test script",
       hook: "test hook",
-      creative_variables: { emotion: "joy", structure: "list", style: "fast" },
+      creative_pattern_id: creativePatternId,
+      trend_reference: trendReference,
       created_at: new Date().toISOString(),
     });
     Object.assign(__singleResponse, { data: script });
@@ -40,7 +43,8 @@ describe("scriptsRepo.createScript", () => {
       productId: script.product_id!,
       scriptText: script.script_text,
       hook: script.hook!,
-      creativeVariables: script.creative_variables as any,
+      creativePatternId,
+      trendReference,
       createdAt: script.created_at!,
     });
 
@@ -60,7 +64,8 @@ describe("scriptsRepo.createScript", () => {
         productId: "c20c2bc8-f124-4f22-bbf8-1fa44b1f9d05",
         scriptText: "body",
         hook: "hook",
-        creativeVariables: { emotion: "calm", structure: "story", style: "direct" },
+        creativePatternId: "0d7717d4-5e2d-4f9f-99b0-5c0c3aa8059d",
+        trendReference: null,
       }),
     ).rejects.toThrow(/Failed to create script/);
   });

@@ -12,7 +12,7 @@ vi.mock("@/repos/products", () => ({
 }));
 
 vi.mock("@/repos/creativePatterns", () => ({
-  listPatternsForProduct: vi.fn(),
+  getCreativePatternById: vi.fn(),
 }));
 
 vi.mock("@/repos/trendSnapshots", () => ({
@@ -34,15 +34,14 @@ vi.mock("@/llm/chains/scriptwriterChain", () => ({
 describe("ScriptwriterAgent", () => {
   const fixedNow = "2024-01-01T00:00:00.000Z";
   const baseInput = {
-    productId: "product-123",
+    productId: "3fa85f64-5717-4562-b3fc-2c963f66afa6",
     productSummary: "A compelling product description.",
-    trendSummaries: [],
-    patternSummaries: [],
-    creativeVariables: { tone: "witty" },
+    creativePatternId: "8c76f6dd-44c3-4d4c-9c28-0d2b6c4c1e62",
+    trendSnapshotIds: ["2b6f0c45-cf59-4f43-b88b-8b7e0c8f44ef"],
   };
 
   const mockPattern = {
-    pattern_id: "pattern-1",
+    pattern_id: "8c76f6dd-44c3-4d4c-9c28-0d2b6c4c1e62",
     structure: "Story arc",
     style_tags: ["casual", "direct"],
     emotion_tags: ["excited"],
@@ -50,7 +49,7 @@ describe("ScriptwriterAgent", () => {
   } as const;
 
   const mockTrend = {
-    snapshot_id: "trend-1",
+    snapshot_id: "2b6f0c45-cf59-4f43-b88b-8b7e0c8f44ef",
     tiktok_trend_tags: ["tag-a", "tag-b"],
     velocity_score: 0.82,
     popularity_score: 0.91,
@@ -77,15 +76,6 @@ describe("ScriptwriterAgent", () => {
     `CTA: ${structuredScript.cta}`,
   ].join("\n");
 
-  const expectedCreativeVariables = {
-    ...baseInput.creativeVariables,
-    emotion: "inspiring",
-    structure: "problem-solution",
-    style: "direct",
-    patternUsed: mockPattern.pattern_id,
-    trendReference: mockTrend.snapshot_id,
-  };
-
   let agent: ScriptwriterAgent;
   let eventCalls: Array<{ eventType: string; payload?: Record<string, unknown> }>;
 
@@ -106,7 +96,9 @@ describe("ScriptwriterAgent", () => {
       description: baseInput.productSummary,
     } as any);
 
-    vi.mocked(creativePatternsRepo.listPatternsForProduct).mockResolvedValue([mockPattern] as any);
+    vi.mocked(creativePatternsRepo.getCreativePatternById).mockResolvedValue(
+      mockPattern as any,
+    );
     vi.mocked(trendSnapshotsRepo.listSnapshotsForProduct).mockResolvedValue([mockTrend] as any);
     vi.mocked(scriptwriterChain).mockResolvedValue(structuredScript);
 
@@ -115,7 +107,8 @@ describe("ScriptwriterAgent", () => {
       product_id: baseInput.productId,
       script_text: expectedScriptText,
       hook: structuredScript.hook,
-      creative_variables: expectedCreativeVariables,
+      creative_pattern_id: baseInput.creativePatternId,
+      trend_reference: mockTrend.snapshot_id,
       created_at: fixedNow,
     } as any);
 
@@ -136,26 +129,26 @@ describe("ScriptwriterAgent", () => {
     const result = await agent.run(baseInput);
 
     expect(productsRepo.getProductById).toHaveBeenCalledWith(baseInput.productId);
-    expect(creativePatternsRepo.listPatternsForProduct).toHaveBeenCalledWith(baseInput.productId);
+    expect(creativePatternsRepo.getCreativePatternById).toHaveBeenCalledWith(
+      baseInput.creativePatternId,
+    );
     expect(trendSnapshotsRepo.listSnapshotsForProduct).toHaveBeenCalledWith(baseInput.productId);
 
     expect(scriptwriterChain).toHaveBeenCalledWith({
       productId: baseInput.productId,
       productSummary: baseInput.productSummary,
-      patternSummaries: [
-        `Pattern ${mockPattern.pattern_id}: structure=${mockPattern.structure}; style=${mockPattern.style_tags?.join(", ")}; emotion=${mockPattern.emotion_tags?.join(", ")}; hook="${mockPattern.hook_text}"`,
-      ],
+      creativePatternId: baseInput.creativePatternId,
       trendSummaries: [
         `Trend ${mockTrend.snapshot_id}: tags=${mockTrend.tiktok_trend_tags?.join(", ")}; velocity=${mockTrend.velocity_score}; popularity=${mockTrend.popularity_score}`,
       ],
-      creativeVariables: baseInput.creativeVariables,
     });
 
     expect(scriptsRepo.createScript).toHaveBeenCalledWith({
       productId: baseInput.productId,
       scriptText: expectedScriptText,
       hook: structuredScript.hook,
-      creativeVariables: expectedCreativeVariables,
+      creativePatternId: baseInput.creativePatternId,
+      trendReference: mockTrend.snapshot_id,
       createdAt: fixedNow,
     });
 
@@ -204,7 +197,7 @@ describe("ScriptwriterAgent", () => {
     await expect(agent.run(invalidInput)).rejects.toThrow();
 
     expect(productsRepo.getProductById).not.toHaveBeenCalled();
-    expect(creativePatternsRepo.listPatternsForProduct).not.toHaveBeenCalled();
+    expect(creativePatternsRepo.getCreativePatternById).not.toHaveBeenCalled();
     expect(trendSnapshotsRepo.listSnapshotsForProduct).not.toHaveBeenCalled();
     expect(scriptwriterChain).not.toHaveBeenCalled();
     expect(scriptsRepo.createScript).not.toHaveBeenCalled();

@@ -4,7 +4,8 @@ import { ScriptwriterAgent } from "@/agents/ScriptwriterAgent";
 import * as agentNotesRepo from "@/repos/agentNotes";
 import * as productsRepo from "@/repos/products";
 import * as scriptsRepo from "@/repos/scripts";
-import { ScriptWriterInput, ScriptOutput } from "@/schemas/scriptwriterSchemas";
+import { scriptwriterAgentInputSchema } from "@/schemas/agentSchemas";
+import { ScriptOutput } from "@/schemas/scriptwriterSchemas";
 import { scriptInsertSchema } from "@/schemas/scriptsSchema";
 import * as scriptwriterChainModule from "@/llm/chains/scriptwriterChain";
 
@@ -230,8 +231,11 @@ describeIf("ScriptwriterAgent integration", () => {
       meta: null,
     });
 
+    const creativePatternId = "8c76f6dd-44c3-4d4c-9c28-0d2b6c4c1e62";
+    const trendSnapshotId = "2b6f0c45-cf59-4f43-b88b-8b7e0c8f44ef";
+
     mockDb.db.creative_patterns.push({
-      pattern_id: "pattern-1",
+      pattern_id: creativePatternId,
       product_id: productId,
       structure: "Story arc",
       style_tags: ["casual"],
@@ -246,7 +250,7 @@ describeIf("ScriptwriterAgent integration", () => {
     });
 
     mockDb.db.trend_snapshots.push({
-      snapshot_id: "trend-1",
+      snapshot_id: trendSnapshotId,
       product_id: productId,
       tiktok_trend_tags: ["tag-a", "tag-b"],
       velocity_score: 0.9,
@@ -256,12 +260,11 @@ describeIf("ScriptwriterAgent integration", () => {
       meta: null,
     });
 
-    const input = ScriptWriterInput.parse({
+    const input = scriptwriterAgentInputSchema.parse({
       productId,
       productSummary: product.description,
-      trendSummaries: ["Trending summary"],
-      patternSummaries: ["Pattern summary"],
-      creativeVariables: { tone: "witty" },
+      creativePatternId,
+      trendSnapshotIds: [trendSnapshotId],
     });
 
     const agent = new ScriptwriterAgent({ agentName });
@@ -270,12 +273,15 @@ describeIf("ScriptwriterAgent integration", () => {
     expect(chainSpy).toHaveBeenCalledWith({
       productId,
       productSummary: product.description,
-      trendSummaries: ["Trending summary"],
-      patternSummaries: ["Pattern summary"],
-      creativeVariables: { tone: "witty" },
+      creativePatternId,
+      trendSummaries: [
+        `Trend ${trendSnapshotId}: tags=tag-a, tag-b; velocity=0.9; popularity=0.8`,
+      ],
     });
 
-    const storedScript = await scriptsRepo.getScriptById(result.scriptId);
+    const storedScript = (await scriptsRepo.getScriptById(
+      result.scriptId,
+    )) as any;
     expect(storedScript).toBeTruthy();
     expect(storedScript?.product_id).toBe(productId);
     expect(storedScript?.hook).toBe(structuredScript.hook);
@@ -285,7 +291,8 @@ describeIf("ScriptwriterAgent integration", () => {
       productId: storedScript?.product_id,
       scriptText: storedScript?.script_text,
       hook: storedScript?.hook,
-      creativeVariables: storedScript?.creative_variables,
+      creativePatternId: storedScript?.creative_pattern_id,
+      trendReference: storedScript?.trend_reference,
       createdAt: storedScript?.created_at,
     });
 
@@ -328,12 +335,26 @@ describeIf("ScriptwriterAgent integration", () => {
       meta: null,
     });
 
-    const input = ScriptWriterInput.parse({
+    mockDb.db.creative_patterns.push({
+      pattern_id: "8c76f6dd-44c3-4d4c-9c28-0d2b6c4c1e62",
+      product_id: productId,
+      structure: "Story arc",
+      style_tags: ["casual"],
+      emotion_tags: ["bold"],
+      hook_text: "Lead with surprise",
+      created_at: new Date().toISOString(),
+      updated_at: null,
+      description: "A reusable pattern",
+      name: "Pattern One",
+      meta: null,
+      source_platform: "integration",
+    });
+
+    const input = scriptwriterAgentInputSchema.parse({
       productId,
       productSummary: "Integration product description",
-      trendSummaries: [],
-      patternSummaries: [],
-      creativeVariables: {},
+      creativePatternId: "8c76f6dd-44c3-4d4c-9c28-0d2b6c4c1e62",
+      trendSnapshotIds: [],
     });
 
     const agent = new ScriptwriterAgent({ agentName });
