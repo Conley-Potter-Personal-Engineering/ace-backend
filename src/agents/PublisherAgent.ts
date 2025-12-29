@@ -13,6 +13,7 @@ export interface PublisherAgentResult {
   asset: Tables<"video_assets">;
   experiments: Tables<"experiments">[];
   results: PublishResult[];
+  experimentId?: string | null;
 }
 
 export class PublisherAgentError extends Error {
@@ -39,15 +40,19 @@ export class PublisherAgent extends BaseAgent {
 
     try {
       const input = PublishRequestSchema.parse(rawInput);
-      const asset = await this.getAsset(input.assetId);
-      const scriptId = input.scriptId ?? asset.script_id ?? null;
-      const productId = input.productId ?? null;
+      const { asset, scriptId, productId, experimentId } = await this.resolveAssetContext(input);
 
-      const results = this.simulatePublishing(asset.asset_id, input.platforms);
+      const resolvedPlatforms = this.resolvePlatforms(input.platforms);
+      const results = this.simulatePublishing({
+        assetId: asset.asset_id,
+        platforms: resolvedPlatforms,
+        videoUrl: input.videoUrl ?? asset.storage_path ?? undefined,
+      });
       const experiments = await this.persistExperiments({
         assetId: asset.asset_id,
         scriptId,
         productId,
+        experimentId,
         results,
       });
 
@@ -55,19 +60,22 @@ export class PublisherAgent extends BaseAgent {
         asset,
         experiments,
         results,
+        experimentId,
       };
 
       await this.logEvent("publish.success", {
         assetId: asset.asset_id,
         scriptId,
         productId,
-        platforms: input.platforms.map((platform) => platform.platform),
+        experimentId,
+        platforms: resolvedPlatforms.map((platform) => platform.platform),
         results,
       });
       await this.logEvent("agent.success", {
         assetId: asset.asset_id,
         scriptId,
         productId,
+        experimentId,
       });
 
       return response;
@@ -90,6 +98,58 @@ export class PublisherAgent extends BaseAgent {
     }
   }
 
+  private async resolveAssetContext(
+    input: PublishRequest,
+  ): Promise<{
+    asset: Tables<"video_assets">;
+    scriptId: string | null;
+    productId: string | null;
+    experimentId: string | null;
+  }> {
+    let assetId = input.assetId;
+    let scriptId = input.scriptId ?? null;
+    let productId = input.productId ?? null;
+    const experimentId = input.experimentId ?? null;
+
+    if (!assetId && experimentId) {
+      const experiment = await experimentsRepo.getExperimentById(experimentId);
+      if (!experiment) {
+        throw new PublisherAgentError(
+          `Experiment ${experimentId} not found`,
+          "NOT_FOUND",
+        );
+      }
+      assetId = experiment.asset_id ?? undefined;
+      scriptId = scriptId ?? experiment.script_id ?? null;
+      productId = productId ?? experiment.product_id ?? null;
+    }
+
+    if (!assetId) {
+      throw new PublisherAgentError(
+        "assetId is required when experiment does not provide one",
+        "VALIDATION",
+      );
+    }
+
+    const asset = await this.getAsset(assetId);
+    const resolvedScriptId = scriptId ?? asset.script_id ?? null;
+
+    return {
+      asset,
+      scriptId: resolvedScriptId,
+      productId,
+      experimentId,
+    };
+  }
+
+  private resolvePlatforms(platforms: PublishPlatform[]): PublishPlatform[] {
+    if (platforms.length > 0) {
+      return platforms;
+    }
+
+    return [{ platform: "youtube", tags: [] }];
+  }
+
   private async getAsset(assetId: string): Promise<Tables<"video_assets">> {
     const asset = await videoAssetsRepo.getVideoAssetById(assetId);
 
@@ -103,17 +163,22 @@ export class PublisherAgent extends BaseAgent {
     return asset;
   }
 
-  private simulatePublishing(
-    assetId: string,
-    platforms: PublishPlatform[],
-  ): PublishResult[] {
+  private simulatePublishing({
+    assetId,
+    platforms,
+    videoUrl,
+  }: {
+    assetId: string;
+    platforms: PublishPlatform[];
+    videoUrl?: string;
+  }): PublishResult[] {
     const publishedAt = this.now();
     return platforms.map((platform, index) => {
       const slug = `${platform.platform}-${assetId.slice(0, 8)}-${index + 1}`;
       return {
         platform: platform.platform,
         status: "published" as const,
-        url: `https://${platform.platform}.example.com/watch/${slug}`,
+        url: videoUrl ?? `https://${platform.platform}.example.com/watch/${slug}`,
         externalId: `mock-${slug}`,
         publishedAt,
         notes: platform.description ?? platform.title ?? "Mock publish completed",
@@ -125,18 +190,46 @@ export class PublisherAgent extends BaseAgent {
     assetId,
     scriptId,
     productId,
+    experimentId,
     results,
   }: {
     assetId: string;
     scriptId: string | null;
     productId: string | null;
+    experimentId: string | null;
     results: PublishResult[];
   }): Promise<Tables<"experiments">[]> {
     const createdAt = this.now();
     const createdExperiments: Tables<"experiments">[] = [];
 
+    if (experimentId) {
+      try {
+        const updated = await experimentsRepo.updateExperiment(experimentId, {
+          asset_id: assetId,
+          script_id: scriptId,
+          product_id: productId,
+          hypothesis: `Mock publish to ${results[0]?.platform ?? "unknown"}`,
+          variation_label: results[0]?.platform ?? null,
+        });
+
+        if (updated) {
+          createdExperiments.push(updated);
+        }
+      } catch (error) {
+        throw new PublisherAgentError(
+          `Failed to update experiment ${experimentId}: ${
+            error instanceof Error ? error.message : String(error)
+          }`,
+          "PERSISTENCE",
+        );
+      }
+    }
+
     for (const result of results) {
       try {
+        if (experimentId && createdExperiments.length > 0) {
+          continue;
+        }
         const experiment = await experimentsRepo.createExperiment({
           asset_id: assetId,
           script_id: scriptId,

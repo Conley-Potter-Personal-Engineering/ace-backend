@@ -82,6 +82,7 @@ export const VideoAssetSchema = z.object({
 
 export type VideoAsset = z.infer<typeof VideoAssetSchema>;
 
+
 export const PublishPlatformSchema = z.object({
   platform: z.enum(["youtube", "tiktok", "instagram", "facebook", "linkedin", "x"]),
   title: z.string().trim().min(1).optional(),
@@ -91,14 +92,26 @@ export const PublishPlatformSchema = z.object({
 
 export type PublishPlatform = z.infer<typeof PublishPlatformSchema>;
 
-export const PublishRequestSchema = z.object({
-  assetId: z.string().uuid("assetId must be a valid UUID"),
-  scriptId: z.string().uuid("scriptId must be a valid UUID").optional(),
-  productId: z.string().uuid("productId must be a valid UUID").optional(),
-  platforms: z
-    .array(PublishPlatformSchema)
-    .min(1, "At least one publishing target is required"),
-});
+export const PublishRequestSchema = z
+  .object({
+    assetId: z.string().uuid("assetId must be a valid UUID").optional(),
+    experimentId: z.string().uuid("experimentId must be a valid UUID").optional(),
+    scriptId: z.string().uuid("scriptId must be a valid UUID").optional(),
+    productId: z.string().uuid("productId must be a valid UUID").optional(),
+    videoUrl: z.string().url("videoUrl must be a valid URL").optional(),
+    platforms: z
+      .array(PublishPlatformSchema)
+      .default([]),
+  })
+  .superRefine((value, ctx) => {
+    if (!value.assetId && !value.experimentId) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: "Either assetId or experimentId must be provided",
+        path: ["assetId"],
+      });
+    }
+  });
 
 export type PublishRequest = z.infer<typeof PublishRequestSchema>;
 
