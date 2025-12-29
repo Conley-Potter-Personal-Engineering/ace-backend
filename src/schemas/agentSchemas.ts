@@ -81,3 +81,36 @@ export const VideoAssetSchema = z.object({
 });
 
 export type VideoAsset = z.infer<typeof VideoAssetSchema>;
+
+export const PublishPlatformSchema = z.object({
+  platform: z.enum(["youtube", "tiktok", "instagram", "facebook", "linkedin", "x"]),
+  title: z.string().trim().min(1).optional(),
+  description: z.string().trim().min(1).optional(),
+  tags: z.array(z.string().trim().min(1)).default([]),
+});
+
+export type PublishPlatform = z.infer<typeof PublishPlatformSchema>;
+
+export const PublishRequestSchema = z.object({
+  assetId: z.string().uuid("assetId must be a valid UUID"),
+  scriptId: z.string().uuid("scriptId must be a valid UUID").optional(),
+  productId: z.string().uuid("productId must be a valid UUID").optional(),
+  platforms: z
+    .array(PublishPlatformSchema)
+    .min(1, "At least one publishing target is required"),
+});
+
+export type PublishRequest = z.infer<typeof PublishRequestSchema>;
+
+export const PublishResultSchema = z.object({
+  platform: PublishPlatformSchema.shape.platform,
+  status: z.literal("published"),
+  url: z.string().url("url must be a valid URL"),
+  externalId: z.string().trim().min(1, "externalId is required"),
+  publishedAt: z
+    .string()
+    .refine((value) => !Number.isNaN(Date.parse(value)), "publishedAt must be a valid ISO date"),
+  notes: z.string().trim().optional(),
+});
+
+export type PublishResult = z.infer<typeof PublishResultSchema>;
