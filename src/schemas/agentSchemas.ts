@@ -1,25 +1,25 @@
 import { z } from "zod";
 
-export const scriptwriterAgentInputSchema = z.object({
-  productId: z.string().uuid("productId must be a valid UUID"),
-  productSummary: z
-    .string()
-    .trim()
-    .min(1, "Product summary is required"),
-  creativePatternId: z.string().uuid("creativePatternId must be a valid UUID"),
-  trendSnapshotIds: z.array(z.string().uuid()).optional().default([]),
-});
-
-export type ScriptwriterAgentInput = z.infer<typeof scriptwriterAgentInputSchema>;
-
 export const ScriptWriterInput = z.object({
   productId: z.string().uuid("productId must be a valid UUID"),
   productSummary: z.string().trim().min(1, "Product summary is required"),
   creativePatternId: z.string().uuid("creativePatternId must be a valid UUID"),
+  trendSnapshotIds: z.array(z.string().uuid()).optional().default([]),
   trendSummaries: z.array(z.string().trim().min(1)).default([]),
 });
 
 export type ScriptWriterInputType = z.infer<typeof ScriptWriterInput>;
+
+export const ScriptwriterAgentInputSchema = z
+  .object({
+    productId: z.string().uuid("productId must be a valid UUID"),
+    productSummary: z.string().trim().min(1, "Product summary is required"),
+    creativePatternId: z.string().uuid("creativePatternId must be a valid UUID"),
+    trendSnapshotIds: z.array(z.string().uuid()).optional().default([]),
+  })
+  .strict();
+
+export type ScriptwriterAgentInput = z.infer<typeof ScriptwriterAgentInputSchema>;
 
 export const ScriptOutput = z.object({
   title: z.string(),
@@ -30,13 +30,6 @@ export const ScriptOutput = z.object({
 });
 
 export type ScriptOutputType = z.infer<typeof ScriptOutput>;
-
-export const editorAgentInputSchema = z.object({
-  scriptId: z.string().uuid("scriptId must be a valid UUID"),
-  overrideStoragePath: z.string().trim().min(1).optional(),
-});
-
-export type EditorAgentInput = z.infer<typeof editorAgentInputSchema>;
 
 export const editorChainOutputSchema = z.object({
   storagePath: z.string().trim().min(1, "Storage path is required"),

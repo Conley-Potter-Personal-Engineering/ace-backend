@@ -5,7 +5,7 @@ import * as creativePatternsRepo from "@/repos/creativePatterns";
 import * as productsRepo from "@/repos/products";
 import * as scriptsRepo from "@/repos/scripts";
 import * as trendSnapshotsRepo from "@/repos/trendSnapshots";
-import { scriptwriterAgentInputSchema } from "@/schemas/agentSchemas";
+import { ScriptwriterAgentInputSchema } from "@/schemas/agentSchemas";
 import {
   ScriptOutput,
   type ScriptOutputType,
@@ -26,8 +26,11 @@ const summarizePattern = (pattern: CreativePattern): string => {
   const emotion = (pattern.emotion_tags ?? []).join(", ") || "no emotion tags";
   const structure = pattern.structure ?? "unspecified structure";
   const hook = pattern.hook_text ?? "no hook provided";
+  const notes = pattern.notes ?? "no notes provided";
+  const observed_performance = pattern.observed_performance ?? "no observed performance provided";
 
-  return `Pattern ${pattern.pattern_id}: structure=${structure}; style=${style}; emotion=${emotion}; hook="${hook}"`;
+
+  return `Pattern ${pattern.pattern_id}: structure=${structure}; style=${style}; emotion=${emotion}; hook="${hook}; notes=${notes}; observed_performance=${observed_performance}"`;
 };
 
 const summarizeTrend = (snapshot: TrendSnapshot): string => {
@@ -67,7 +70,7 @@ export class ScriptwriterAgent extends BaseAgent {
     await this.logEvent("script.generate.start", { input: rawInput });
 
     try {
-      const input = scriptwriterAgentInputSchema.parse(rawInput);
+      const input = ScriptwriterAgentInputSchema.parse(rawInput);
 
       const product = await productsRepo.getProductById(input.productId);
       if (!product) {
@@ -98,6 +101,7 @@ export class ScriptwriterAgent extends BaseAgent {
           product.name ||
           "No product summary available.",
         creativePatternId: input.creativePatternId,
+        trendSnapshotIds: input.trendSnapshotIds,
         trendSummaries: resolvedTrendSnapshots.map(summarizeTrend),
       };
 

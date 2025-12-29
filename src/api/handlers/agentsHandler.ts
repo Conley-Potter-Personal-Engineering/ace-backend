@@ -2,10 +2,8 @@ import { EditorAgent } from "../../agents/EditorAgent";
 import { ScriptwriterAgent } from "../../agents/ScriptwriterAgent";
 import type BaseAgent from "../../agents/BaseAgent";
 import { fetchRecentSystemEvents, logSystemEvent } from "../../repos/systemEvents";
-import {
-  editorAgentInputSchema,
-  scriptwriterAgentInputSchema,
-} from "../../schemas/agentSchemas";
+import { ScriptwriterAgentInputSchema } from "../../schemas/agentSchemas";
+import { EditorRequestSchema } from "../../schemas/editorSchemas";
 import {
   agentNameSchema,
   type AgentName,
@@ -42,11 +40,11 @@ type TriggerAgentRunError = {
 const agentRegistry: Record<AgentName, AgentDescriptor> = {
   ScriptwriterAgent: {
     create: () => new ScriptwriterAgent(),
-    inputSchema: scriptwriterAgentInputSchema,
+    inputSchema: ScriptwriterAgentInputSchema,
   },
   EditorAgent: {
     create: () => new EditorAgent(),
-    inputSchema: editorAgentInputSchema,
+    inputSchema: EditorRequestSchema,
   },
 };
 

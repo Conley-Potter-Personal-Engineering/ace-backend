@@ -4,7 +4,7 @@ import { ScriptwriterAgent } from "@/agents/ScriptwriterAgent";
 import * as agentNotesRepo from "@/repos/agentNotes";
 import * as productsRepo from "@/repos/products";
 import * as scriptsRepo from "@/repos/scripts";
-import { scriptwriterAgentInputSchema } from "@/schemas/agentSchemas";
+import { ScriptwriterAgentInputSchema } from "@/schemas/agentSchemas";
 import { ScriptOutput } from "@/schemas/scriptwriterSchemas";
 import { scriptInsertSchema } from "@/schemas/scriptsSchema";
 import * as scriptwriterChainModule from "@/llm/chains/scriptwriterChain";
@@ -260,7 +260,7 @@ describeIf("ScriptwriterAgent integration", () => {
       meta: null,
     });
 
-    const input = scriptwriterAgentInputSchema.parse({
+    const input = ScriptwriterAgentInputSchema.parse({
       productId,
       productSummary: product.description,
       creativePatternId,
@@ -274,6 +274,7 @@ describeIf("ScriptwriterAgent integration", () => {
       productId,
       productSummary: product.description,
       creativePatternId,
+      trendSnapshotIds: [trendSnapshotId],
       trendSummaries: [
         `Trend ${trendSnapshotId}: tags=tag-a, tag-b; velocity=0.9; popularity=0.8`,
       ],
@@ -350,7 +351,7 @@ describeIf("ScriptwriterAgent integration", () => {
       source_platform: "integration",
     });
 
-    const input = scriptwriterAgentInputSchema.parse({
+    const input = ScriptwriterAgentInputSchema.parse({
       productId,
       productSummary: "Integration product description",
       creativePatternId: "8c76f6dd-44c3-4d4c-9c28-0d2b6c4c1e62",

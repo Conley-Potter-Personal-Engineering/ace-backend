@@ -138,6 +138,7 @@ describe("ScriptwriterAgent", () => {
       productId: baseInput.productId,
       productSummary: baseInput.productSummary,
       creativePatternId: baseInput.creativePatternId,
+      trendSnapshotIds: baseInput.trendSnapshotIds,
       trendSummaries: [
         `Trend ${mockTrend.snapshot_id}: tags=${mockTrend.tiktok_trend_tags?.join(", ")}; velocity=${mockTrend.velocity_score}; popularity=${mockTrend.popularity_score}`,
       ],
