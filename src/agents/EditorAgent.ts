@@ -5,7 +5,7 @@ import * as scriptsRepo from "@/repos/scripts";
 import * as video_assetsRepo from "@/repos/videoAssets";
 import {
   EditorRequestSchema,
-  editorChainOutputSchema,
+  EditorChainOutputSchema,
   type EditorRequest,
   VideoAssetSchema,
   type VideoAsset,
@@ -53,7 +53,7 @@ export class EditorAgent extends BaseAgent {
         input.styleTemplateId,
       );
 
-      const validatedChain = editorChainOutputSchema.parse({
+      const validatedChain = EditorChainOutputSchema.parse({
         storagePath: chainResult.storagePath,
         durationSeconds: chainResult.durationSeconds,
         thumbnailPath: chainResult.thumbnailPath,

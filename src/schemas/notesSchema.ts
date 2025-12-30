@@ -1,6 +1,6 @@
 import { z } from "zod";
 
-export const agentNoteInputSchema = z.object({
+export const AgentNoteInputSchema = z.object({
   agentName: z.string().trim().min(1, "Agent name is required"),
   content: z.string().trim().min(1, "Note content is required"),
   embedding: z.string().trim().min(1).optional(),
@@ -8,4 +8,4 @@ export const agentNoteInputSchema = z.object({
   topic: z.string().trim().min(1).optional(),
 });
 
-export type AgentNoteInputDTO = z.infer<typeof agentNoteInputSchema>;
+export type AgentNoteInput = z.infer<typeof AgentNoteInputSchema>;

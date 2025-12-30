@@ -3,12 +3,12 @@ import { ScriptwriterAgent } from "../../agents/ScriptwriterAgent";
 import type BaseAgent from "../../agents/BaseAgent";
 import { fetchRecentSystemEvents, logSystemEvent } from "../../repos/systemEvents";
 import {
-  editorAgentInputSchema,
-  scriptwriterAgentInputSchema,
+  EditorAgentInputSchema,
+  ScriptwriterAgentInputSchema,
 } from "../../schemas/agentSchemas";
 import {
-  agentNameSchema,
-  agentRunRequestSchema,
+  AgentNameSchema,
+  AgentRunRequestSchema,
   type AgentName,
 } from "../../schemas/apiSchemas";
 import { z } from "zod";
@@ -30,11 +30,11 @@ interface AgentDescriptor {
 const agentRegistry: Record<AgentName, AgentDescriptor> = {
   ScriptwriterAgent: {
     create: () => new ScriptwriterAgent(),
-    inputSchema: scriptwriterAgentInputSchema,
+    inputSchema: ScriptwriterAgentInputSchema,
   },
   EditorAgent: {
     create: () => new EditorAgent(),
-    inputSchema: editorAgentInputSchema,
+    inputSchema: EditorAgentInputSchema,
   },
 };
 
@@ -107,14 +107,14 @@ export const triggerAgentRun = async (
   agentName: string,
   rawBody: unknown,
 ) => {
-  const validatedName = agentNameSchema.parse(agentName);
+  const validatedName = AgentNameSchema.parse(agentName);
   const agent = agentRegistry[validatedName];
 
   if (!agent) {
     throw new Error(`Agent ${validatedName} is not registered`);
   }
 
-  const parsedBody = agentRunRequestSchema.parse(rawBody ?? {});
+  const parsedBody = AgentRunRequestSchema.parse(rawBody ?? {});
   const parsedInput = agent.inputSchema.parse(parsedBody.input ?? {});
   const startedAt = new Date().toISOString();
 

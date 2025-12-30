@@ -1,16 +1,16 @@
 import { z } from "zod";
 
-const positiveInt = z.number().int().nonnegative();
+const PositiveIntSchema = z.number().int().nonnegative();
 
-export const performanceMetricInputSchema = z.object({
+export const PerformanceMetricInputSchema = z.object({
   collectedAt: z.string().datetime().optional(),
-  commentCount: positiveInt.optional(),
+  commentCount: PositiveIntSchema.optional(),
   completionRate: z.number().min(0).optional(),
-  likeCount: positiveInt.optional(),
+  likeCount: PositiveIntSchema.optional(),
   postId: z.string().uuid().optional(),
-  shareCount: positiveInt.optional(),
-  viewCount: positiveInt.optional(),
-  watchTimeMs: positiveInt.optional(),
+  shareCount: PositiveIntSchema.optional(),
+  viewCount: PositiveIntSchema.optional(),
+  watchTimeMs: PositiveIntSchema.optional(),
 });
 
-export type PerformanceMetricInputDTO = z.infer<typeof performanceMetricInputSchema>;
+export type PerformanceMetricInput = z.infer<typeof PerformanceMetricInputSchema>;

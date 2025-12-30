@@ -1,6 +1,6 @@
 import { jsonSchema, z } from "../repos/validators";
 
-const creativeVariablesSchema = z
+const CreativeVariablesSchema = z
   .object({
     emotion: z.string().trim().min(1, "Emotion is required"),
     structure: z.string().trim().min(1, "Structure is required"),
@@ -8,13 +8,13 @@ const creativeVariablesSchema = z
   })
   .catchall(jsonSchema);
 
-export const scriptInsertSchema = z.object({
+export const ScriptInsertSchema = z.object({
   scriptId: z.string().uuid().optional(),
   productId: z.string().uuid("Product ID must be a valid UUID"),
   scriptText: z.string().trim().min(1, "Script text is required"),
   hook: z.string().trim().min(1, "Hook is required"),
-  creativeVariables: creativeVariablesSchema,
+  creativeVariables: CreativeVariablesSchema,
   createdAt: z.string().datetime().nullable().optional(),
 });
 
-export type ScriptInsertDTO = z.infer<typeof scriptInsertSchema>;
+export type ScriptInsert = z.infer<typeof ScriptInsertSchema>;

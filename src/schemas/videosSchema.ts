@@ -1,28 +1,28 @@
 import { z } from "zod";
 
-const tagArraySchema = z.array(z.string().trim().min(1));
-const positiveInt = z.number().int().nonnegative();
+const TagArraySchema = z.array(z.string().trim().min(1));
+const PositiveIntSchema = z.number().int().nonnegative();
 
-export const videoAssetInputSchema = z.object({
+export const VideoAssetInputSchema = z.object({
   storagePath: z.string().trim().min(1, "Storage path is required"),
   scriptId: z.string().uuid().optional(),
-  durationSeconds: positiveInt.optional(),
+  durationSeconds: PositiveIntSchema.optional(),
   thumbnailPath: z.string().trim().min(1).optional(),
 });
 
-export type VideoAssetInputDTO = z.infer<typeof videoAssetInputSchema>;
+export type VideoAssetInput = z.infer<typeof VideoAssetInputSchema>;
 
-export const rawVideoInputSchema = z.object({
+export const RawVideoInputSchema = z.object({
   externalId: z.string().trim().min(1, "External id is required"),
   platform: z.string().trim().min(1, "Platform is required"),
   author: z.string().trim().min(1).optional(),
   caption: z.string().trim().min(1).optional(),
   collectedAt: z.string().datetime().optional(),
-  hashtags: tagArraySchema.optional(),
-  commentCount: positiveInt.optional(),
-  likeCount: positiveInt.optional(),
-  shareCount: positiveInt.optional(),
-  viewCount: positiveInt.optional(),
+  hashtags: TagArraySchema.optional(),
+  commentCount: PositiveIntSchema.optional(),
+  likeCount: PositiveIntSchema.optional(),
+  shareCount: PositiveIntSchema.optional(),
+  viewCount: PositiveIntSchema.optional(),
 });
 
-export type RawVideoInputDTO = z.infer<typeof rawVideoInputSchema>;
+export type RawVideoInput = z.infer<typeof RawVideoInputSchema>;

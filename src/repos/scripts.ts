@@ -1,12 +1,12 @@
 import { getSupabase } from "../db/db";
 import type { Tables, TablesInsert, TablesUpdate } from "../db/types";
 import {
-  type ScriptInsertDTO,
-  scriptInsertSchema,
+  type ScriptInsert,
+  ScriptInsertSchema,
 } from "../schemas/scriptsSchema";
 
 const mapToDbPayload = (
-  payload: ScriptInsertDTO,
+  payload: ScriptInsert,
 ): TablesInsert<"scripts"> => ({
   script_id: payload.scriptId,
   product_id: payload.productId,
@@ -16,10 +16,10 @@ const mapToDbPayload = (
   created_at: payload.createdAt,
 });
 
-export type ScriptInsertPayload = ScriptInsertDTO;
+export type ScriptInsertPayload = ScriptInsert;
 
-export const createScript = async (payload: ScriptInsertDTO) => {
-  scriptInsertSchema.parse(payload);
+export const createScript = async (payload: ScriptInsert) => {
+  ScriptInsertSchema.parse(payload);
 
   const { data, error } = await getSupabase()
     .from("scripts")

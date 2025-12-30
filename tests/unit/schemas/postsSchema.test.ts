@@ -1,19 +1,19 @@
 import { describe, expect, it } from "vitest";
-import { publishedPostInputSchema } from "../../../src/schemas/postsSchema";
+import { PublishedPostInputSchema } from "../../../src/schemas/postsSchema";
 
-describe("publishedPostInputSchema", () => {
+describe("PublishedPostInputSchema", () => {
   it("parses valid input", () => {
     const input = {
       platform: "TikTok",
       caption: "Check this out!",
       hashtags: ["#viral", "#fyp"],
     };
-    const result = publishedPostInputSchema.parse(input);
+    const result = PublishedPostInputSchema.parse(input);
     expect(result).toEqual(input);
   });
 
   it("requires platform", () => {
-    expect(() => publishedPostInputSchema.parse({})).toThrow();
+    expect(() => PublishedPostInputSchema.parse({})).toThrow();
   });
 
   it("validates UUID for experimentId", () => {
@@ -21,6 +21,6 @@ describe("publishedPostInputSchema", () => {
       platform: "TikTok",
       experimentId: "invalid-uuid",
     };
-    expect(() => publishedPostInputSchema.parse(input)).toThrow();
+    expect(() => PublishedPostInputSchema.parse(input)).toThrow();
   });
 });

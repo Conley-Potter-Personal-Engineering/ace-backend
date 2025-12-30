@@ -1,11 +1,11 @@
 import { z } from "zod";
 
-export const scriptwriterAgentInputSchema = z.object({
+export const ScriptwriterAgentInputSchema = z.object({
   productId: z.string().uuid("productId must be a valid UUID"),
   warmupNotes: z.array(z.string().trim().min(1)).optional(),
 });
 
-export type ScriptwriterAgentInput = z.infer<typeof scriptwriterAgentInputSchema>;
+export type ScriptwriterAgentInput = z.infer<typeof ScriptwriterAgentInputSchema>;
 
 export const ScriptWriterInput = z.object({
   productId: z.string(),
@@ -27,14 +27,14 @@ export const ScriptOutput = z.object({
 
 export type ScriptOutputType = z.infer<typeof ScriptOutput>;
 
-export const editorAgentInputSchema = z.object({
+export const EditorAgentInputSchema = z.object({
   scriptId: z.string().uuid("scriptId must be a valid UUID"),
   overrideStoragePath: z.string().trim().min(1).optional(),
 });
 
-export type EditorAgentInput = z.infer<typeof editorAgentInputSchema>;
+export type EditorAgentInput = z.infer<typeof EditorAgentInputSchema>;
 
-export const editorChainOutputSchema = z.object({
+export const EditorChainOutputSchema = z.object({
   storagePath: z.string().trim().min(1, "Storage path is required"),
   durationSeconds: z.number().int().positive().optional(),
   thumbnailPath: z.string().trim().min(1).optional(),
@@ -53,7 +53,7 @@ export const editorChainOutputSchema = z.object({
   }),
 });
 
-export type EditorChainOutput = z.infer<typeof editorChainOutputSchema>;
+export type EditorChainOutput = z.infer<typeof EditorChainOutputSchema>;
 
 export const EditorRequestSchema = z.object({
   scriptId: z.string().uuid("scriptId must be a valid UUID"),
@@ -81,8 +81,6 @@ export const VideoAssetSchema = z.object({
 });
 
 export type VideoAsset = z.infer<typeof VideoAssetSchema>;
-
-
 export const PublishPlatformSchema = z.object({
   platform: z.enum(["youtube", "tiktok", "instagram", "facebook", "linkedin", "x"]),
   title: z.string().trim().min(1).optional(),

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { productInputSchema } from "../../../src/schemas/productsSchema";
+import { ProductInputSchema } from "../../../src/schemas/productsSchema";
 
 describe("productsSchema", () => {
   it("parses valid input", () => {
@@ -8,12 +8,12 @@ describe("productsSchema", () => {
       sourcePlatform: "Shopify",
       category: "Electronics",
     };
-    const result = productInputSchema.parse(input);
+    const result = ProductInputSchema.parse(input);
     expect(result).toEqual(input);
   });
 
   it("requires name and sourcePlatform", () => {
-    expect(() => productInputSchema.parse({})).toThrow();
+    expect(() => ProductInputSchema.parse({})).toThrow();
   });
 
   it("validates URLs", () => {
@@ -22,6 +22,6 @@ describe("productsSchema", () => {
       sourcePlatform: "Test",
       affiliateLink: "not-a-url",
     };
-    expect(() => productInputSchema.parse(input)).toThrow();
+    expect(() => ProductInputSchema.parse(input)).toThrow();
   });
 });
