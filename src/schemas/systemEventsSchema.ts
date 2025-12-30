@@ -6,6 +6,8 @@ export const SystemEventInputSchema = z.object({
   eventType: z.string().trim().min(1, "Event type is required"),
   agentName: z.string().trim().min(1).optional(),
   eventId: z.string().uuid().optional(),
+  correlation_id: z.string().uuid().optional(),
+  workflow_id: z.string().uuid(),
   payload: PayloadSchema.optional(),
 });
 

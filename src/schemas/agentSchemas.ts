@@ -1,4 +1,7 @@
 import { z } from "zod";
+import { ProductSchema } from "./productsSchema";
+import { CreativePatternSchema } from "./patternsSchema";
+import { TrendSnapshotSchema } from "./trendsSchema";
 
 export const ScriptwriterAgentInputSchema = z.object({
   productId: z.string().uuid("productId must be a valid UUID"),
@@ -6,6 +9,16 @@ export const ScriptwriterAgentInputSchema = z.object({
 });
 
 export type ScriptwriterAgentInput = z.infer<typeof ScriptwriterAgentInputSchema>;
+
+export const ScriptRequestSchema = z.object({
+  product: ProductSchema,
+  pattern: CreativePatternSchema.nullable(),
+  trend: TrendSnapshotSchema.nullable(),
+  workflow_id: z.string().uuid(),
+  correlation_id: z.string().uuid().optional(),
+});
+
+export type ScriptRequest = z.infer<typeof ScriptRequestSchema>;
 
 export const ScriptWriterInput = z.object({
   productId: z.string(),
