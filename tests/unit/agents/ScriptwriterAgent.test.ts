@@ -29,6 +29,7 @@ vi.mock("@/repos/agentNotes", () => ({
 
 vi.mock("@/llm/chains/scriptwriterChain", () => ({
   scriptwriterChain: vi.fn(),
+  ScriptwriterChainError: class ScriptwriterChainError extends Error {},
 }));
 
 describe("ScriptwriterAgent", () => {
@@ -79,9 +80,9 @@ describe("ScriptwriterAgent", () => {
 
   const expectedCreativeVariables = {
     ...baseInput.creativeVariables,
-    emotion: "inspiring",
-    structure: "problem-solution",
-    style: "direct",
+    emotion: "excited",
+    structure: "Story arc",
+    style: "casual",
     patternUsed: mockPattern.pattern_id,
     trendReference: mockTrend.snapshot_id,
   };

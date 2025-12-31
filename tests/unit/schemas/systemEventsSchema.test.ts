@@ -6,6 +6,7 @@ describe("SystemEventInputSchema", () => {
     const input = {
       eventType: "TEST_EVENT",
       agentName: "TestAgent",
+      workflow_id: "123e4567-e89b-12d3-a456-426614174000",
       payload: { key: "value" },
     };
     const result = SystemEventInputSchema.parse(input);

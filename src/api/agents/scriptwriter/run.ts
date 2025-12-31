@@ -35,7 +35,7 @@ const isBadRequestError = (error: ScriptwriterAgentError): boolean =>
 
 export default async function handler(
   req: ApiRequest,
-  res: ApiResponseLike<ScriptwriterRunResponse>,
+  res: ApiResponseLike,
 ) {
   if (req.method !== "POST") {
     return badRequest(res, "Method not allowed");

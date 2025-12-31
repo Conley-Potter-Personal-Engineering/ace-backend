@@ -28,6 +28,12 @@ import BaseAgent from "./BaseAgent";
 type CreativePattern = Tables<"creative_patterns">;
 type TrendSnapshot = Tables<"trend_snapshots">;
 type Product = Tables<"products">;
+type CreativeVariables = {
+  emotion: string;
+  structure: string;
+  style: string;
+  [key: string]: unknown;
+};
 
 export interface ScriptwriterResult {
   script: Tables<"scripts">;
@@ -117,7 +123,7 @@ const buildCreativeVariables = ({
   baseVariables?: Record<string, string>;
   pattern?: CreativePattern | null;
   trend?: TrendSnapshot | null;
-}): Record<string, unknown> => {
+}): CreativeVariables => {
   const base = baseVariables ?? {};
   const emotion = base.emotion ?? pickFirst(pattern?.emotion_tags, "inspiring");
   const structure = base.structure ?? pattern?.structure ?? "problem-solution";
@@ -455,7 +461,7 @@ export class ScriptwriterAgent extends BaseAgent {
   }: {
     productId: string;
     structuredScript: ScriptOutputType;
-    creativeVariables: Record<string, unknown>;
+    creativeVariables: CreativeVariables;
   }): Promise<ScriptwriterResult> {
     try {
       const createdScript = await scriptsRepo.createScript({
