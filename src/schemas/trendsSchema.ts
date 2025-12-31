@@ -1,16 +1,20 @@
 import { z } from "zod";
 
-const metadataSchema = z.record(z.any());
-const tagArraySchema = z.array(z.string().trim().min(1));
+const TagArraySchema = z.array(z.string());
+const RawSourceDataSchema = z.record(z.any());
 
-export const trendSnapshotInputSchema = z.object({
-  productId: z.string().uuid(),
-  snapshotTime: z.string().datetime().optional(),
-  competitionScore: z.number().min(0).optional(),
-  popularityScore: z.number().min(0).optional(),
-  velocityScore: z.number().min(0).optional(),
-  tiktokTrendTags: tagArraySchema.optional(),
-  rawSourceData: metadataSchema.optional(),
+export const TrendSnapshotSchema = z.object({
+  snapshot_id: z.string().uuid(),
+  product_id: z.string().uuid(),
+  popularity_score: z.number().min(0).max(100),
+  velocity_score: z.number(),
+  competition_score: z.number().nullable(),
+  tiktok_trend_tags: TagArraySchema.default([]),
+  raw_source_data: RawSourceDataSchema.nullable(),
+  snapshot_time: z.string().datetime(),
 });
 
-export type TrendSnapshotInputDTO = z.infer<typeof trendSnapshotInputSchema>;
+export const TrendSnapshotInputSchema = TrendSnapshotSchema;
+
+export type TrendSnapshot = z.infer<typeof TrendSnapshotSchema>;
+export type TrendSnapshotInput = z.infer<typeof TrendSnapshotInputSchema>;

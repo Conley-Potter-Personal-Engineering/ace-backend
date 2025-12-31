@@ -4,9 +4,8 @@ import { ScriptwriterAgent } from "@/agents/ScriptwriterAgent";
 import * as agentNotesRepo from "@/repos/agentNotes";
 import * as productsRepo from "@/repos/products";
 import * as scriptsRepo from "@/repos/scripts";
-import { ScriptwriterAgentInputSchema } from "@/schemas/agentSchemas";
-import { ScriptOutput } from "@/schemas/scriptwriterSchemas";
-import { scriptInsertSchema } from "@/schemas/scriptsSchema";
+import { ScriptWriterInput, ScriptOutput } from "@/schemas/scriptwriterSchemas";
+import { ScriptInsertSchema } from "@/schemas/scriptsSchema";
 import * as scriptwriterChainModule from "@/llm/chains/scriptwriterChain";
 
 type TableName =
@@ -287,7 +286,7 @@ describeIf("ScriptwriterAgent integration", () => {
     expect(storedScript?.product_id).toBe(productId);
     expect(storedScript?.hook).toBe(structuredScript.hook);
     expect(storedScript?.script_text).toContain(structuredScript.body);
-    scriptInsertSchema.parse({
+    ScriptInsertSchema.parse({
       scriptId: storedScript?.script_id,
       productId: storedScript?.product_id,
       scriptText: storedScript?.script_text,

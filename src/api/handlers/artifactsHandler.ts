@@ -1,5 +1,5 @@
 import { getScriptById, getVideoAssetById, listVideoAssets } from "../../repos";
-import { artifactIdSchema, artifactsQuerySchema } from "../../schemas/apiSchemas";
+import { ArtifactIdSchema, ArtifactsQuerySchema } from "../../schemas/apiSchemas";
 
 const truncate = (text: string, maxLength: number) => {
   if (text.length <= maxLength) {
@@ -37,7 +37,7 @@ export interface ArtifactDetail {
 }
 
 export const listArtifacts = async (rawQuery: Record<string, string | undefined>) => {
-  const parsedQuery = artifactsQuerySchema.parse(rawQuery);
+  const parsedQuery = ArtifactsQuerySchema.parse(rawQuery);
   const limit = parsedQuery.limit ?? 20;
   const assets = await listVideoAssets();
 
@@ -63,7 +63,7 @@ export const listArtifacts = async (rawQuery: Record<string, string | undefined>
 };
 
 export const fetchArtifactDetail = async (artifactId: string) => {
-  const validatedId = artifactIdSchema.parse(artifactId);
+  const validatedId = ArtifactIdSchema.parse(artifactId);
   const asset = await getVideoAssetById(validatedId);
 
   if (!asset) {

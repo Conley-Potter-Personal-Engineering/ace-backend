@@ -1,5 +1,6 @@
 export {
-  editorChainOutputSchema,
+  EditorAgentInputSchema,
+  EditorChainOutputSchema,
   EditorRequestSchema,
   VideoAssetSchema,
   type EditorChainOutput,

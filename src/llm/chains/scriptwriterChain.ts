@@ -1,22 +1,119 @@
-import { ScriptWriterInput, ScriptOutput, type ScriptOutputType, type ScriptWriterInputType } from "@/schemas/scriptwriterSchemas";
-import { createScriptwriterModel } from "../models/openaiModel";
+import { z } from "zod";
+import { ChatOpenAI } from "@langchain/openai";
+import { ScriptOutput, type ScriptOutputType } from "@/schemas/scriptwriterSchemas";
+import {
+  ScriptwriterPromptInputSchema,
+  buildScriptwriterPrompt,
+  type ScriptwriterPromptInput,
+} from "../prompts/scriptwriterPrompt";
+import {
+  ScriptwriterParserError,
+  parseScriptwriterOutput,
+  type ScriptwriterParserOutput,
+} from "../parsers/scriptwriterParser";
 
-const scriptwriterModel = createScriptwriterModel();
+const ScriptwriterChainInputSchema = ScriptwriterPromptInputSchema;
 
-const toBulletList = (items: string[], fallback: string): string =>
-  items.length ? items.map((item) => `- ${item}`).join("\n") : `- ${fallback}`;
+export type ScriptwriterChainInput = z.infer<typeof ScriptwriterChainInputSchema>;
 
-const stripCodeFences = (raw: string): string => {
-  const trimmed = raw.trim();
+export interface ScriptwriterChainOptions {
+  model?: string;
+  temperature?: number;
+  reasoningEffort?: "low" | "medium" | "high";
+  maxTokens?: number;
+}
 
-  if (!trimmed.startsWith("```")) {
-    return trimmed;
+export class ScriptwriterChainError extends Error {
+  code:
+    | "INPUT_VALIDATION"
+    | "MODEL_INVOCATION"
+    | "FALLBACK_FAILED";
+  cause?: unknown;
+
+  constructor(
+    message: string,
+    code: ScriptwriterChainError["code"],
+    cause?: unknown,
+  ) {
+    super(message);
+    this.name = "ScriptwriterChainError";
+    this.code = code;
+    this.cause = cause;
+  }
+}
+
+const hasOpenAICredentials = (): boolean =>
+  Boolean(
+    process.env.OPENAI_API_KEY ??
+      process.env.AZURE_OPENAI_API_KEY ??
+      process.env.OPENAI_ACCESS_TOKEN,
+  );
+
+const shouldMockModel = (): boolean =>
+  process.env.NODE_ENV === "test" || process.env.MOCK_LLM === "true";
+
+class StaticResponseChatModel {
+  constructor(private readonly response: string) {}
+
+  async invoke(): Promise<{ content: string }> {
+    return { content: this.response };
+  }
+}
+
+const buildModelConfig = (
+  options: ScriptwriterChainOptions,
+): Record<string, unknown> => {
+  const {
+    model = process.env.SCRIPTWRITER_MODEL ?? "gpt-5",
+    temperature = 0.7,
+    reasoningEffort,
+    maxTokens = 1500,
+  } = options;
+
+  const baseConfig: Record<string, unknown> = {
+    modelName: model,
+    maxTokens,
+  };
+
+  if (model.startsWith("o1") || model.startsWith("o3")) {
+    if (reasoningEffort) {
+      baseConfig.reasoning_effort = reasoningEffort;
+    }
+  } else {
+    baseConfig.temperature = temperature;
   }
 
-  const withoutOpeningFence = trimmed.replace(/^```(?:json)?/i, "");
-  const withoutClosingFence = withoutOpeningFence.replace(/```$/, "");
+  return baseConfig;
+};
 
-  return withoutClosingFence.trim();
+const createScriptwriterModel = (
+  options: ScriptwriterChainOptions,
+): ChatOpenAI => {
+  if (shouldMockModel()) {
+    return new StaticResponseChatModel(
+      JSON.stringify({
+        title: "Test Script Title",
+        hook: "Test hook",
+        cta: "Test CTA",
+        outline: ["Intro", "Body", "Close"],
+        script_text: "This is a test script body used for local and CI runs.",
+        creative_variables: {
+          tone: "energetic",
+          structure: "problem-solution",
+          style: "direct",
+        },
+      }),
+    ) as unknown as ChatOpenAI;
+  }
+
+  if (!hasOpenAICredentials()) {
+    throw new ScriptwriterChainError(
+      "OpenAI or Azure OpenAI credentials are required for the Scriptwriter model.",
+      "MODEL_INVOCATION",
+    );
+  }
+
+  return new ChatOpenAI(buildModelConfig(options));
 };
 
 const extractContent = (modelResponse: unknown): string => {
@@ -47,65 +144,77 @@ const extractContent = (modelResponse: unknown): string => {
       .trim();
   }
 
-  throw new Error("Unexpected LLM response format; no content to parse.");
+  throw new ScriptwriterChainError(
+    "Unexpected LLM response format; no content to parse.",
+    "MODEL_INVOCATION",
+  );
 };
 
-const buildPrompt = (input: ScriptWriterInputType): string => {
-  const { productId, productSummary, creativePatternId, trendSummaries } = input;
+const buildFallbackPrompt = (input: ScriptwriterPromptInput): string => {
+  const productName = "product" in input ? input.product.name : input.productId;
 
   return [
-    "You are the Autonomous Content Engine's (ACE) Scriptwriter v2. Create a concise, persuasive short-form video script grounded in the provided context.",
-    "Return ONLY a JSON object with this exact shape:",
-    JSON.stringify(
-      {
-        title: "string",
-        hook: "string",
-        cta: "string",
-        outline: ["string", "string"],
-        body: "string",
-      },
-      null,
-      2,
-    ),
-    `Product ID: ${productId}`,
-    `Product Summary:\n${productSummary}`,
-    `Creative Pattern ID: ${creativePatternId}`,
-    `Trend Summaries:\n${toBulletList(trendSummaries ?? [], "No trend summaries provided.")}`,
-    "Constraints:",
-    "- Keep pacing tight for a 15-60 second short-form video.",
-    "- Incorporate relevant trends and creative patterns naturally.",
-    "- Outline should list the key beats before the full body text.",
-    "- Do not include explanations or markdown fences; respond with raw JSON only.",
-  ].join("\n\n");
+    `Create a short-form video script for ${productName}.`,
+    "Return JSON with: title, hook, outline (array), script_text, cta, creative_variables (optional).",
+  ].join(" ");
 };
 
+const normalizeToScriptOutput = (
+  parsed: ScriptwriterParserOutput,
+): ScriptOutputType =>
+  ScriptOutput.parse({
+    title: parsed.title,
+    hook: parsed.hook,
+    cta: parsed.cta,
+    outline: parsed.outline,
+    body: parsed.script_text,
+  });
+
 export async function scriptwriterChain(
-  input: ScriptWriterInputType,
+  rawInput: ScriptwriterChainInput,
+  options: ScriptwriterChainOptions = {},
 ): Promise<ScriptOutputType> {
-  const validatedInput = ScriptWriterInput.parse(input);
-  const prompt = buildPrompt(validatedInput);
-
-  const rawResponse = await scriptwriterModel.invoke(prompt);
-  const rawContent = extractContent(rawResponse);
-  const sanitized = stripCodeFences(rawContent);
-
-  let parsedOutput: unknown;
+  let validatedInput: ScriptwriterPromptInput;
   try {
-    parsedOutput = JSON.parse(sanitized);
+    validatedInput = ScriptwriterChainInputSchema.parse(rawInput);
   } catch (error) {
-    const reason = error instanceof Error ? error.message : "Unknown error";
-    throw new Error(
-      `Scriptwriter chain returned invalid JSON: ${reason}. Raw content: ${sanitized}`,
+    throw new ScriptwriterChainError(
+      "Scriptwriter chain input failed validation.",
+      "INPUT_VALIDATION",
+      error,
     );
   }
 
-  try {
-    return ScriptOutput.parse(parsedOutput);
-  } catch (error) {
-    if (error instanceof Error) {
-      throw new Error(`Scriptwriter output validation failed: ${error.message}`);
-    }
+  const prompt = buildScriptwriterPrompt(validatedInput);
+  const llm = createScriptwriterModel(options);
 
-    throw error;
+  try {
+    const response = await llm.invoke(prompt);
+    const content = extractContent(response);
+    const parsed = parseScriptwriterOutput(content);
+    return normalizeToScriptOutput(parsed);
+  } catch (error) {
+    const fallbackPrompt = buildFallbackPrompt(validatedInput);
+
+    try {
+      const fallbackResponse = await llm.invoke(fallbackPrompt);
+      const fallbackContent = extractContent(fallbackResponse);
+      const fallbackParsed = parseScriptwriterOutput(fallbackContent);
+      return normalizeToScriptOutput(fallbackParsed);
+    } catch (fallbackError) {
+      if (fallbackError instanceof ScriptwriterParserError) {
+        throw new ScriptwriterChainError(
+          "Scriptwriter chain fallback failed to parse output.",
+          "FALLBACK_FAILED",
+          fallbackError,
+        );
+      }
+
+      throw new ScriptwriterChainError(
+        "Scriptwriter chain fallback failed.",
+        "FALLBACK_FAILED",
+        fallbackError,
+      );
+    }
   }
 }

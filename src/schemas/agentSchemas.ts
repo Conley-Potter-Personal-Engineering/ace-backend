@@ -1,4 +1,24 @@
 import { z } from "zod";
+import { ProductSchema } from "./productsSchema";
+import { CreativePatternSchema } from "./patternsSchema";
+import { TrendSnapshotSchema } from "./trendsSchema";
+
+export const ScriptwriterAgentInputSchema = z.object({
+  productId: z.string().uuid("productId must be a valid UUID"),
+  warmupNotes: z.array(z.string().trim().min(1)).optional(),
+});
+
+export type ScriptwriterAgentInput = z.infer<typeof ScriptwriterAgentInputSchema>;
+
+export const ScriptRequestSchema = z.object({
+  product: ProductSchema,
+  pattern: CreativePatternSchema.nullable(),
+  trend: TrendSnapshotSchema.nullable(),
+  workflow_id: z.string().uuid(),
+  correlation_id: z.string().uuid().optional(),
+});
+
+export type ScriptRequest = z.infer<typeof ScriptRequestSchema>;
 
 export const ScriptWriterInput = z.object({
   productId: z.string().uuid("productId must be a valid UUID"),
@@ -31,7 +51,14 @@ export const ScriptOutput = z.object({
 
 export type ScriptOutputType = z.infer<typeof ScriptOutput>;
 
-export const editorChainOutputSchema = z.object({
+export const EditorAgentInputSchema = z.object({
+  scriptId: z.string().uuid("scriptId must be a valid UUID"),
+  overrideStoragePath: z.string().trim().min(1).optional(),
+});
+
+export type EditorAgentInput = z.infer<typeof EditorAgentInputSchema>;
+
+export const EditorChainOutputSchema = z.object({
   storagePath: z.string().trim().min(1, "Storage path is required"),
   durationSeconds: z.number().int().positive().optional(),
   thumbnailPath: z.string().trim().min(1).optional(),
@@ -50,7 +77,7 @@ export const editorChainOutputSchema = z.object({
   }),
 });
 
-export type EditorChainOutput = z.infer<typeof editorChainOutputSchema>;
+export type EditorChainOutput = z.infer<typeof EditorChainOutputSchema>;
 
 export const EditorRequestSchema = z.object({
   scriptId: z.string().uuid("scriptId must be a valid UUID"),
@@ -78,3 +105,47 @@ export const VideoAssetSchema = z.object({
 });
 
 export type VideoAsset = z.infer<typeof VideoAssetSchema>;
+export const PublishPlatformSchema = z.object({
+  platform: z.enum(["youtube", "tiktok", "instagram", "facebook", "linkedin", "x"]),
+  title: z.string().trim().min(1).optional(),
+  description: z.string().trim().min(1).optional(),
+  tags: z.array(z.string().trim().min(1)).default([]),
+});
+
+export type PublishPlatform = z.infer<typeof PublishPlatformSchema>;
+
+export const PublishRequestSchema = z
+  .object({
+    assetId: z.string().uuid("assetId must be a valid UUID").optional(),
+    experimentId: z.string().uuid("experimentId must be a valid UUID").optional(),
+    scriptId: z.string().uuid("scriptId must be a valid UUID").optional(),
+    productId: z.string().uuid("productId must be a valid UUID").optional(),
+    videoUrl: z.string().url("videoUrl must be a valid URL").optional(),
+    platforms: z
+      .array(PublishPlatformSchema)
+      .default([]),
+  })
+  .superRefine((value, ctx) => {
+    if (!value.assetId && !value.experimentId) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: "Either assetId or experimentId must be provided",
+        path: ["assetId"],
+      });
+    }
+  });
+
+export type PublishRequest = z.infer<typeof PublishRequestSchema>;
+
+export const PublishResultSchema = z.object({
+  platform: PublishPlatformSchema.shape.platform,
+  status: z.literal("published"),
+  url: z.string().url("url must be a valid URL"),
+  externalId: z.string().trim().min(1, "externalId is required"),
+  publishedAt: z
+    .string()
+    .refine((value) => !Number.isNaN(Date.parse(value)), "publishedAt must be a valid ISO date"),
+  notes: z.string().trim().optional(),
+});
+
+export type PublishResult = z.infer<typeof PublishResultSchema>;

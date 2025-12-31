@@ -1,12 +1,12 @@
 import { z } from "zod";
 
-const metadataSchema = z.record(z.any());
+const MetadataSchema = z.record(z.any());
 
-export const embeddingInputSchema = z.object({
+export const EmbeddingInputSchema = z.object({
   embedding: z.string().trim().min(1, "Embedding vector is required"),
-  metadata: metadataSchema.optional(),
+  metadata: MetadataSchema.optional(),
   referenceId: z.string().uuid(),
   referenceType: z.string().trim().min(1, "Reference type is required"),
 });
 
-export type EmbeddingInputDTO = z.infer<typeof embeddingInputSchema>;
+export type EmbeddingInput = z.infer<typeof EmbeddingInputSchema>;

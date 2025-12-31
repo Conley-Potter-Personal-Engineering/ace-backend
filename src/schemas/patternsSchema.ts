@@ -1,16 +1,20 @@
 import { z } from "zod";
 
-const metadataSchema = z.record(z.any());
-const tagArraySchema = z.array(z.string().trim().min(1));
+const ObservedPerformanceSchema = z.record(z.union([z.string(), z.number()]));
 
-export const creativePatternInputSchema = z.object({
-  hookText: z.string().trim().min(1).optional(),
-  notes: z.string().trim().min(1).optional(),
-  observedPerformance: metadataSchema.optional(),
-  productId: z.string().uuid().optional(),
-  structure: z.string().trim().min(1).optional(),
-  styleTags: tagArraySchema.optional(),
-  emotionTags: tagArraySchema.optional(),
+export const CreativePatternSchema = z.object({
+  pattern_id: z.string().uuid(),
+  product_id: z.string().uuid(),
+  hook_text: z.string().nullable(),
+  structure: z.string().nullable(),
+  style_tags: z.array(z.string()).default([]),
+  emotion_tags: z.array(z.string()).default([]),
+  observed_performance: ObservedPerformanceSchema.nullable(),
+  notes: z.string().nullable(),
+  created_at: z.string().datetime(),
 });
 
-export type CreativePatternInputDTO = z.infer<typeof creativePatternInputSchema>;
+export const CreativePatternInputSchema = CreativePatternSchema;
+
+export type CreativePattern = z.infer<typeof CreativePatternSchema>;
+export type CreativePatternInput = z.infer<typeof CreativePatternInputSchema>;

@@ -4,7 +4,7 @@ import type { NextApiRequest, NextApiResponse } from "next";
 import { getSupabase } from "@/db/supabase";
 import type { Json } from "@/db/types";
 import { logSystemEvent } from "@/repos/systemEvents";
-import { signupRequestSchema, type SignupRequest } from "@/schemas/apiSchemas";
+import { SignupRequestSchema, type SignupRequest } from "@/schemas/apiSchemas";
 
 type SignupResponse =
   | {
@@ -38,7 +38,7 @@ export const authSignupHandler = async (
 ) => {
   let credentials: SignupRequest;
   try {
-    credentials = signupRequestSchema.parse(req.body ?? {});
+    credentials = SignupRequestSchema.parse(req.body ?? {});
   } catch (err) {
     const message =
       err instanceof Error ? err.message : "Invalid signup payload";

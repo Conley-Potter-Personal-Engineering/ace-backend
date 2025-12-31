@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { experimentInputSchema } from "../../../src/schemas/experimentsSchema";
+import { ExperimentInputSchema } from "../../../src/schemas/experimentsSchema";
 
 describe("experimentsSchema", () => {
   it("parses valid input", () => {
@@ -7,13 +7,13 @@ describe("experimentsSchema", () => {
       hypothesis: "test hypothesis",
       variationLabel: "A",
     };
-    const result = experimentInputSchema.parse(input);
+    const result = ExperimentInputSchema.parse(input);
     expect(result).toEqual(input);
   });
 
   it("allows optional fields", () => {
     const input = {};
-    const result = experimentInputSchema.parse(input);
+    const result = ExperimentInputSchema.parse(input);
     expect(result).toEqual(input);
   });
 
@@ -21,6 +21,6 @@ describe("experimentsSchema", () => {
     const input = {
       productId: "invalid-uuid",
     };
-    expect(() => experimentInputSchema.parse(input)).toThrow();
+    expect(() => ExperimentInputSchema.parse(input)).toThrow();
   });
 });

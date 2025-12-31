@@ -1,8 +1,8 @@
 import { logSystemEvent } from "../../repos/systemEvents";
-import { feedbackRequestSchema, type FeedbackRequest } from "../../schemas/apiSchemas";
+import { FeedbackRequestSchema, type FeedbackRequest } from "../../schemas/apiSchemas";
 
 export const recordFeedback = async (rawBody: unknown) => {
-  const feedback: FeedbackRequest = feedbackRequestSchema.parse(rawBody ?? {});
+  const feedback: FeedbackRequest = FeedbackRequestSchema.parse(rawBody ?? {});
 
   await logSystemEvent({
     agent_name: "FeedbackAPI",

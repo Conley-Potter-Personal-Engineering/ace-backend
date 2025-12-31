@@ -1,12 +1,14 @@
 import { z } from "zod";
 
-const payloadSchema = z.record(z.any());
+const PayloadSchema = z.record(z.any());
 
-export const systemEventInputSchema = z.object({
+export const SystemEventInputSchema = z.object({
   eventType: z.string().trim().min(1, "Event type is required"),
   agentName: z.string().trim().min(1).optional(),
   eventId: z.string().uuid().optional(),
-  payload: payloadSchema.optional(),
+  correlation_id: z.string().uuid().optional(),
+  workflow_id: z.string().uuid(),
+  payload: PayloadSchema.optional(),
 });
 
-export type SystemEventInputDTO = z.infer<typeof systemEventInputSchema>;
+export type SystemEventInput = z.infer<typeof SystemEventInputSchema>;

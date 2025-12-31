@@ -29,6 +29,7 @@ vi.mock("@/repos/agentNotes", () => ({
 
 vi.mock("@/llm/chains/scriptwriterChain", () => ({
   scriptwriterChain: vi.fn(),
+  ScriptwriterChainError: class ScriptwriterChainError extends Error {},
 }));
 
 describe("ScriptwriterAgent", () => {
@@ -75,6 +76,15 @@ describe("ScriptwriterAgent", () => {
     "",
     `CTA: ${structuredScript.cta}`,
   ].join("\n");
+
+  const expectedCreativeVariables = {
+    ...baseInput.creativeVariables,
+    emotion: "excited",
+    structure: "Story arc",
+    style: "casual",
+    patternUsed: mockPattern.pattern_id,
+    trendReference: mockTrend.snapshot_id,
+  };
 
   let agent: ScriptwriterAgent;
   let eventCalls: Array<{ eventType: string; payload?: Record<string, unknown> }>;

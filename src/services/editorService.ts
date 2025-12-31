@@ -4,7 +4,7 @@ import {
   type EditorChainResult,
 } from "../llm/chains/editorChain";
 import { createVideoAsset } from "../repos";
-import { videoAssetInputSchema } from "../schemas/videosSchema";
+import { VideoAssetInputSchema } from "../schemas/videosSchema";
 
 export interface RenderedAssetResult {
   asset: Tables<"video_assets">;
@@ -30,7 +30,7 @@ export async function renderVideoAsset({
     storagePathHint: overrideStoragePath ?? defaultStoragePathForScript(script.script_id),
   });
 
-  const validatedAsset = videoAssetInputSchema.parse({
+  const validatedAsset = VideoAssetInputSchema.parse({
     storagePath: chainResult.storagePath,
     scriptId: script.script_id,
     durationSeconds: chainResult.durationSeconds,

@@ -1,8 +1,8 @@
 import { fetchRecentSystemEvents, logSystemEvent } from "../../repos/systemEvents";
 import type { Json } from "../../db/types";
 import {
-  workflowIdSchema,
-  workflowStartRequestSchema,
+  WorkflowIdSchema,
+  WorkflowStartRequestSchema,
   type WorkflowId,
 } from "../../schemas/apiSchemas";
 
@@ -136,8 +136,8 @@ export const listWorkflowStatuses = async (): Promise<WorkflowStatusRow[]> => {
   return Array.from(statuses.values()).sort((a, b) => a.id.localeCompare(b.id));
 };
 export const startWorkflow = async (workflowId: string, rawBody: unknown): Promise<{ workflow: WorkflowId; status: "started" }> => {
-  const validatedId = workflowIdSchema.parse(workflowId);
-  const parsedBody = workflowStartRequestSchema.parse(rawBody ?? {});
+  const validatedId = WorkflowIdSchema.parse(workflowId);
+  const parsedBody = WorkflowStartRequestSchema.parse(rawBody ?? {});
 
   await logSystemEvent({
     agent_name: validatedId,

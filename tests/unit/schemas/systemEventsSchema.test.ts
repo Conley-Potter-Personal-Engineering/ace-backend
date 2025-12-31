@@ -1,25 +1,26 @@
 import { describe, expect, it } from "vitest";
-import { systemEventInputSchema } from "../../../src/schemas/systemEventsSchema";
+import { SystemEventInputSchema } from "../../../src/schemas/systemEventsSchema";
 
-describe("systemEventInputSchema", () => {
+describe("SystemEventInputSchema", () => {
   it("parses valid input", () => {
     const input = {
       eventType: "TEST_EVENT",
       agentName: "TestAgent",
+      workflow_id: "123e4567-e89b-12d3-a456-426614174000",
       payload: { key: "value" },
     };
-    const result = systemEventInputSchema.parse(input);
+    const result = SystemEventInputSchema.parse(input);
     expect(result).toEqual(input);
   });
 
   it("requires eventType", () => {
-    expect(() => systemEventInputSchema.parse({})).toThrow();
+    expect(() => SystemEventInputSchema.parse({})).toThrow();
   });
 
   it("validates empty strings", () => {
     const input = {
       eventType: "",
     };
-    expect(() => systemEventInputSchema.parse(input)).toThrow();
+    expect(() => SystemEventInputSchema.parse(input)).toThrow();
   });
 });

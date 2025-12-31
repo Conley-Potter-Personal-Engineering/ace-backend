@@ -4,7 +4,7 @@ import type { NextApiRequest, NextApiResponse } from "next";
 import { getSupabase } from "@/db/supabase";
 import type { Json } from "@/db/types";
 import { logSystemEvent } from "@/repos/systemEvents";
-import { loginRequestSchema, type LoginRequest } from "@/schemas/apiSchemas";
+import { LoginRequestSchema, type LoginRequest } from "@/schemas/apiSchemas";
 
 type LoginResponse =
   | {
@@ -35,7 +35,7 @@ export const authLoginHandler = async (
 ) => {
   let credentials: LoginRequest;
   try {
-    credentials = loginRequestSchema.parse(req.body ?? {});
+    credentials = LoginRequestSchema.parse(req.body ?? {});
   } catch (err) {
     const message =
       err instanceof Error ? err.message : "Invalid login payload";

@@ -2,10 +2,13 @@ import { EditorAgent } from "../../agents/EditorAgent";
 import { ScriptwriterAgent } from "../../agents/ScriptwriterAgent";
 import type BaseAgent from "../../agents/BaseAgent";
 import { fetchRecentSystemEvents, logSystemEvent } from "../../repos/systemEvents";
-import { ScriptwriterAgentInputSchema } from "../../schemas/agentSchemas";
-import { EditorRequestSchema } from "../../schemas/editorSchemas";
 import {
-  agentNameSchema,
+  EditorAgentInputSchema,
+  ScriptwriterAgentInputSchema,
+} from "../../schemas/agentSchemas";
+import {
+  AgentNameSchema,
+  AgentRunRequestSchema,
   type AgentName,
 } from "../../schemas/apiSchemas";
 import { z } from "zod";
@@ -44,7 +47,7 @@ const agentRegistry: Record<AgentName, AgentDescriptor> = {
   },
   EditorAgent: {
     create: () => new EditorAgent(),
-    inputSchema: EditorRequestSchema,
+    inputSchema: EditorAgentInputSchema,
   },
 };
 
@@ -121,32 +124,16 @@ export const listAgentStatuses = async (): Promise<AgentStatusRow[]> => {
 export const triggerAgentRun = async (
   agentName: string,
   rawBody: unknown,
-): Promise<TriggerAgentRunSuccess | TriggerAgentRunError> => {
-  const parsedRequest = runAgentSchema.safeParse(rawBody);
-  if (!parsedRequest.success) {
-    return {
-      error: "Invalid run agent payload",
-      details: parsedRequest.error.format(),
-    };
-  }
-
-  const { agent: requestedAgentName, input } = parsedRequest.data;
-  const pathNameMatch = agentNameSchema.safeParse(agentName);
-  if (pathNameMatch.success && pathNameMatch.data !== requestedAgentName) {
-    throw new Error(
-      `Agent ${pathNameMatch.data} does not match payload agent ${requestedAgentName}`,
-    );
-  }
-
-  const agentDescriptor = agentRegistry[requestedAgentName];
+) => {
+  const validatedName = AgentNameSchema.parse(agentName);
+  const agent = agentRegistry[validatedName];
 
   if (!agentDescriptor) {
     throw new Error(`Agent ${requestedAgentName} is not registered`);
   }
 
-  console.log("Raw body:", rawBody);
-
-  const validatedInput = agentDescriptor.inputSchema.parse(input ?? {});
+  const parsedBody = AgentRunRequestSchema.parse(rawBody ?? {});
+  const parsedInput = agent.inputSchema.parse(parsedBody.input ?? {});
   const startedAt = new Date().toISOString();
 
   await logSystemEvent({
