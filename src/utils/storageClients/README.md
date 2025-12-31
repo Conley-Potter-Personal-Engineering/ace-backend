@@ -10,7 +10,7 @@ src/utils/storageClients/
 ## Environment Variables
 **Supabase**
 - SUPABASE_URL
-- SUPABASE_KEY
+- SUPABASE_SERVICE_ROLE_KEY or SUPABASE_ANON_KEY
 - SUPABASE_STORAGE_BUCKET (default: video-assets)
 
 **S3**

@@ -7,7 +7,7 @@ const agentNoteInsertSchema = z.object({
   content: z.string().min(1, "Note content is required"),
   created_at: nullableDateSchema,
   embedding: z.string().nullable().optional(),
-  importance: z.number().nullable().optional(),
+  importance: z.number().nullable().optional(), // This should be a number between 1 and 5
   note_id: identifierSchema.optional(),
   topic: z.string().trim().nullable().optional(),
 });

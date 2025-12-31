@@ -20,7 +20,7 @@ const hasOpenAICredentials = (): boolean =>
 const shouldMockModel = (): boolean =>
   process.env.NODE_ENV === "test" || process.env.MOCK_LLM === "true";
 
-export function createScriptwriterModel(temperature = 0.7): ChatOpenAI {
+export function createScriptwriterModel(): ChatOpenAI {
   if (shouldMockModel()) {
     return new StaticResponseChatModel(
       JSON.stringify({
@@ -41,7 +41,6 @@ export function createScriptwriterModel(temperature = 0.7): ChatOpenAI {
 
   return new ChatOpenAI({
     modelName: process.env.SCRIPTWRITER_MODEL ?? "gpt-5",
-    temperature,
   });
 }
 

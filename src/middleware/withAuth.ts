@@ -46,8 +46,15 @@ export function withAuth<T = unknown>(
       return res.status(401).json(unauthorizedBody);
     }
 
+    let supabase: ReturnType<typeof getSupabase>;
     try {
-      const supabase = getSupabase();
+      supabase = getSupabase();
+    } catch (err) {
+      console.error("Supabase initialization failed:", err);
+      throw err;
+    }
+
+    try {
       const {
         data: { user },
         error,

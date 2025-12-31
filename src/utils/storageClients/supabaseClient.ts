@@ -1,12 +1,26 @@
-import { createClient } from "@supabase/supabase-js";
+/**
+ * Supabase client initialized lazily to avoid Turbopack build-time variable freezing.
+ * This ensures process.env values are read only at runtime in Next.js 16+.
+ */
+import { createClient, type SupabaseClient } from "@supabase/supabase-js";
 
-const { SUPABASE_URL, SUPABASE_KEY } = process.env;
+let supabase: SupabaseClient | null = null;
 
-if (!SUPABASE_URL || !SUPABASE_KEY) {
-  throw new Error("Supabase environment variables are missing");
-}
+const getSupabaseClient = (): SupabaseClient => {
+  if (!supabase) {
+    const url = process.env.SUPABASE_URL;
+    const key =
+      process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_ANON_KEY;
 
-const supabase = createClient(SUPABASE_URL, SUPABASE_KEY);
+    if (!url || !key) {
+      throw new Error("Supabase environment variables are missing");
+    }
+
+    supabase = createClient(url, key);
+  }
+
+  return supabase;
+};
 const BUCKET_NAME = "video-assets";
 const DEFAULT_PATH_PREFIX = "videos";
 
@@ -21,6 +35,7 @@ export const uploadToSupabase = async (
   path: string = `${DEFAULT_PATH_PREFIX}/${Date.now()}.mp4`,
 ): Promise<string> => {
   try {
+    const supabase = getSupabaseClient();
     const { error: uploadError } = await supabase.storage
       .from(BUCKET_NAME)
       .upload(path, file, {

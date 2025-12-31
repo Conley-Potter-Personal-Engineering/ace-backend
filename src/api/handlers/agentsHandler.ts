@@ -27,6 +27,19 @@ interface AgentDescriptor {
   inputSchema: z.ZodTypeAny;
 }
 
+type TriggerAgentRunSuccess = {
+  message: string;
+  result: unknown;
+};
+
+type TriggerAgentRunError = {
+  error: string;
+  details: z.ZodFormattedError<{
+    agent: AgentName;
+    input: Record<string, unknown>;
+  }>;
+};
+
 const agentRegistry: Record<AgentName, AgentDescriptor> = {
   ScriptwriterAgent: {
     create: () => new ScriptwriterAgent(),
@@ -37,6 +50,11 @@ const agentRegistry: Record<AgentName, AgentDescriptor> = {
     inputSchema: EditorAgentInputSchema,
   },
 };
+
+const runAgentSchema = z.object({
+  agent: agentNameSchema,
+  input: z.record(z.any()),
+});
 
 const deriveStatus = (eventType?: string | null): AgentStatus => {
   if (!eventType) {
@@ -110,8 +128,8 @@ export const triggerAgentRun = async (
   const validatedName = AgentNameSchema.parse(agentName);
   const agent = agentRegistry[validatedName];
 
-  if (!agent) {
-    throw new Error(`Agent ${validatedName} is not registered`);
+  if (!agentDescriptor) {
+    throw new Error(`Agent ${requestedAgentName} is not registered`);
   }
 
   const parsedBody = AgentRunRequestSchema.parse(rawBody ?? {});
@@ -119,33 +137,39 @@ export const triggerAgentRun = async (
   const startedAt = new Date().toISOString();
 
   await logSystemEvent({
-    agent_name: validatedName,
+    agent_name: requestedAgentName,
     event_type: "agent.start",
-    payload: { trigger: "manual_api", input: parsedInput },
+    payload: { trigger: "manual_api", input: validatedInput },
     created_at: startedAt,
   });
 
   try {
-    const result = await agent.create().execute(parsedInput);
+    console.log("Triggering agent run:", {
+      agent: requestedAgentName,
+      validatedInput,
+    });
+
+    const agentInstance = agentDescriptor.create();
+    const result = await agentInstance.run(validatedInput);
 
     await logSystemEvent({
-      agent_name: validatedName,
+      agent_name: requestedAgentName,
       event_type: "agent.success",
-      payload: { trigger: "manual_api", input: parsedInput },
+      payload: { trigger: "manual_api", input: validatedInput },
       created_at: new Date().toISOString(),
     });
 
     return {
-      message: `Agent ${validatedName} started`,
+      message: `Agent ${requestedAgentName} started`,
       result,
     };
   } catch (error) {
     await logSystemEvent({
-      agent_name: validatedName,
+      agent_name: requestedAgentName,
       event_type: "agent.error",
       payload: {
         trigger: "manual_api",
-        input: parsedInput,
+        input: validatedInput,
         message: error instanceof Error ? error.message : String(error),
       },
       created_at: new Date().toISOString(),

@@ -47,7 +47,13 @@ export const authSignupHandler = async (
     return res.status(400).json({ success: false, error: message });
   }
 
-  const supabase = getSupabase();
+  let supabase: ReturnType<typeof getSupabase>;
+  try {
+    supabase = getSupabase();
+  } catch (err) {
+    console.error("Supabase initialization failed:", err);
+    throw err;
+  }
   await logAuthEvent("auth.signup.start", { email: credentials.email });
 
   try {

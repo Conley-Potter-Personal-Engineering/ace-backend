@@ -5,11 +5,8 @@ const validPayload = {
   productId: "3fa85f64-5717-4562-b3fc-2c963f66afa6",
   scriptText: "Buy this product because it solves your problem!",
   hook: "Stop scrolling and check this out",
-  creativeVariables: {
-    emotion: "excited",
-    structure: "problem-solution",
-    style: "energetic",
-  },
+  creativePatternId: "8c76f6dd-44c3-4d4c-9c28-0d2b6c4c1e62",
+  trendReference: "2b6f0c45-cf59-4f43-b88b-8b7e0c8f44ef",
 };
 
 describe("ScriptInsertSchema", () => {
@@ -25,7 +22,7 @@ describe("ScriptInsertSchema", () => {
       ScriptInsertSchema.parse({
         productId: "not-a-uuid",
         hook: "",
-        creativeVariables: { emotion: "", structure: "", style: "" },
+        creativePatternId: "not-a-uuid",
       }),
     ).toThrow();
   });
