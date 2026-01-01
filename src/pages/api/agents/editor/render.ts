@@ -1,4 +1,4 @@
-import { handleApiError } from "../../../../../api/error";
+import { handleApiError } from "../../../../api/error";
 import {
   badRequest,
   methodNotAllowed,
@@ -6,11 +6,11 @@ import {
   serverError,
   type ApiRequest,
   type ApiResponseLike,
-} from "../../../../../api/http";
+} from "../../../../api/http";
 import {
   AgentApiError,
   renderAssetFromApi,
-} from "../../../../../api/handlers/agentsHandler";
+} from "../../../../api/handlers/agentsHandler";
 
 export default async function handler(
   req: ApiRequest,
