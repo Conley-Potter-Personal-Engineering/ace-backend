@@ -4,7 +4,7 @@ import { ScriptwriterAgent } from "@/agents/ScriptwriterAgent";
 import * as agentNotesRepo from "@/repos/agentNotes";
 import * as productsRepo from "@/repos/products";
 import * as scriptsRepo from "@/repos/scripts";
-import { ScriptWriterInput, ScriptOutput } from "@/schemas/scriptwriterSchemas";
+import { ScriptOutput, ScriptWriterInput } from "@/schemas/scriptwriterSchemas";
 import { ScriptInsertSchema } from "@/schemas/scriptsSchema";
 import * as scriptwriterChainModule from "@/llm/chains/scriptwriterChain";
 
@@ -259,24 +259,25 @@ describeIf("ScriptwriterAgent integration", () => {
       meta: null,
     });
 
-    const input = ScriptwriterAgentInputSchema.parse({
+    const input = ScriptWriterInput.parse({
       productId,
-      productSummary: product.description,
       creativePatternId,
-      trendSnapshotIds: [trendSnapshotId],
+      trendSnapshotId,
     });
 
     const agent = new ScriptwriterAgent({ agentName });
     const result = await agent.run(input);
 
     expect(chainSpy).toHaveBeenCalledWith({
-      productId,
-      productSummary: product.description,
-      creativePatternId,
-      trendSnapshotIds: [trendSnapshotId],
-      trendSummaries: [
-        `Trend ${trendSnapshotId}: tags=tag-a, tag-b; velocity=0.9; popularity=0.8`,
-      ],
+      product: expect.objectContaining({
+        product_id: productId,
+      }),
+      pattern: expect.objectContaining({
+        pattern_id: creativePatternId,
+      }),
+      trend: expect.objectContaining({
+        snapshot_id: trendSnapshotId,
+      }),
     });
 
     const storedScript = (await scriptsRepo.getScriptById(
@@ -291,6 +292,7 @@ describeIf("ScriptwriterAgent integration", () => {
       productId: storedScript?.product_id,
       scriptText: storedScript?.script_text,
       hook: storedScript?.hook,
+      creativeVariables: storedScript?.creative_variables,
       creativePatternId: storedScript?.creative_pattern_id,
       trendReference: storedScript?.trend_reference,
       createdAt: storedScript?.created_at,
@@ -350,11 +352,21 @@ describeIf("ScriptwriterAgent integration", () => {
       source_platform: "integration",
     });
 
-    const input = ScriptwriterAgentInputSchema.parse({
+    mockDb.db.trend_snapshots.push({
+      snapshot_id: "2b6f0c45-cf59-4f43-b88b-8b7e0c8f44ef",
+      product_id: productId,
+      tiktok_trend_tags: ["tag-a", "tag-b"],
+      velocity_score: 0.9,
+      popularity_score: 0.8,
+      created_at: new Date().toISOString(),
+      captured_at: new Date().toISOString(),
+      meta: null,
+    });
+
+    const input = ScriptWriterInput.parse({
       productId,
-      productSummary: "Integration product description",
       creativePatternId: "8c76f6dd-44c3-4d4c-9c28-0d2b6c4c1e62",
-      trendSnapshotIds: [],
+      trendSnapshotId: "2b6f0c45-cf59-4f43-b88b-8b7e0c8f44ef",
     });
 
     const agent = new ScriptwriterAgent({ agentName });

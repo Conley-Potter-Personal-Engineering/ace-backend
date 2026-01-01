@@ -151,7 +151,7 @@ const extractContent = (modelResponse: unknown): string => {
 };
 
 const buildFallbackPrompt = (input: ScriptwriterPromptInput): string => {
-  const productName = "product" in input ? input.product.name : input.productId;
+  const productName = input.product.name ?? "this product";
 
   return [
     `Create a short-form video script for ${productName}.`,
@@ -193,7 +193,7 @@ export async function scriptwriterChain(
     const content = extractContent(response);
     const parsed = parseScriptwriterOutput(content);
     return normalizeToScriptOutput(parsed);
-  } catch (error) {
+  } catch {
     const fallbackPrompt = buildFallbackPrompt(validatedInput);
 
     try {

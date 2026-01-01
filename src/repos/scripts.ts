@@ -12,6 +12,7 @@ const mapToDbPayload = (
   product_id: payload.productId,
   script_text: payload.scriptText,
   hook: payload.hook,
+  creative_variables: payload.creativeVariables,
   creative_pattern_id: payload.creativePatternId,
   trend_reference: payload.trendReference ?? null,
   created_at: payload.createdAt,

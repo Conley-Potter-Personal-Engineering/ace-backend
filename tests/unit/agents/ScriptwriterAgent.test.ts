@@ -13,9 +13,12 @@ vi.mock("@/repos/products", () => ({
 
 vi.mock("@/repos/creativePatterns", () => ({
   getCreativePatternById: vi.fn(),
+  listPatternsForProduct: vi.fn(),
 }));
 
 vi.mock("@/repos/trendSnapshots", () => ({
+  getTrendSnapshotById: vi.fn(),
+  getLatestSnapshotForProduct: vi.fn(),
   listSnapshotsForProduct: vi.fn(),
 }));
 
@@ -36,9 +39,8 @@ describe("ScriptwriterAgent", () => {
   const fixedNow = "2024-01-01T00:00:00.000Z";
   const baseInput = {
     productId: "3fa85f64-5717-4562-b3fc-2c963f66afa6",
-    productSummary: "A compelling product description.",
     creativePatternId: "8c76f6dd-44c3-4d4c-9c28-0d2b6c4c1e62",
-    trendSnapshotIds: ["2b6f0c45-cf59-4f43-b88b-8b7e0c8f44ef"],
+    trendSnapshotId: "2b6f0c45-cf59-4f43-b88b-8b7e0c8f44ef",
   };
 
   const mockPattern = {
@@ -77,15 +79,6 @@ describe("ScriptwriterAgent", () => {
     `CTA: ${structuredScript.cta}`,
   ].join("\n");
 
-  const expectedCreativeVariables = {
-    ...baseInput.creativeVariables,
-    emotion: "excited",
-    structure: "Story arc",
-    style: "casual",
-    patternUsed: mockPattern.pattern_id,
-    trendReference: mockTrend.snapshot_id,
-  };
-
   let agent: ScriptwriterAgent;
   let eventCalls: Array<{ eventType: string; payload?: Record<string, unknown> }>;
 
@@ -103,13 +96,13 @@ describe("ScriptwriterAgent", () => {
     vi.mocked(productsRepo.getProductById).mockResolvedValue({
       product_id: baseInput.productId,
       name: "Test Product",
-      description: baseInput.productSummary,
+      description: "A compelling product description.",
     } as any);
 
     vi.mocked(creativePatternsRepo.getCreativePatternById).mockResolvedValue(
       mockPattern as any,
     );
-    vi.mocked(trendSnapshotsRepo.listSnapshotsForProduct).mockResolvedValue([mockTrend] as any);
+    vi.mocked(trendSnapshotsRepo.getTrendSnapshotById).mockResolvedValue(mockTrend as any);
     vi.mocked(scriptwriterChain).mockResolvedValue(structuredScript);
 
     vi.mocked(scriptsRepo.createScript).mockResolvedValue({
@@ -142,22 +135,27 @@ describe("ScriptwriterAgent", () => {
     expect(creativePatternsRepo.getCreativePatternById).toHaveBeenCalledWith(
       baseInput.creativePatternId,
     );
-    expect(trendSnapshotsRepo.listSnapshotsForProduct).toHaveBeenCalledWith(baseInput.productId);
+    expect(trendSnapshotsRepo.getTrendSnapshotById).toHaveBeenCalledWith(
+      baseInput.trendSnapshotId,
+    );
 
     expect(scriptwriterChain).toHaveBeenCalledWith({
-      productId: baseInput.productId,
-      productSummary: baseInput.productSummary,
-      creativePatternId: baseInput.creativePatternId,
-      trendSnapshotIds: baseInput.trendSnapshotIds,
-      trendSummaries: [
-        `Trend ${mockTrend.snapshot_id}: tags=${mockTrend.tiktok_trend_tags?.join(", ")}; velocity=${mockTrend.velocity_score}; popularity=${mockTrend.popularity_score}`,
-      ],
+      product: expect.objectContaining({
+        product_id: baseInput.productId,
+      }),
+      pattern: mockPattern,
+      trend: mockTrend,
     });
 
     expect(scriptsRepo.createScript).toHaveBeenCalledWith({
       productId: baseInput.productId,
       scriptText: expectedScriptText,
       hook: structuredScript.hook,
+      creativeVariables: expect.objectContaining({
+        emotion: "excited",
+        structure: "Story arc",
+        style: "casual",
+      }),
       creativePatternId: baseInput.creativePatternId,
       trendReference: mockTrend.snapshot_id,
       createdAt: fixedNow,
@@ -203,13 +201,13 @@ describe("ScriptwriterAgent", () => {
   });
 
   it("fails fast on invalid input before calling repos or LLM chain", async () => {
-    const invalidInput = { productId: "", productSummary: "" };
+    const invalidInput = { productId: "" };
 
     await expect(agent.run(invalidInput)).rejects.toThrow();
 
     expect(productsRepo.getProductById).not.toHaveBeenCalled();
     expect(creativePatternsRepo.getCreativePatternById).not.toHaveBeenCalled();
-    expect(trendSnapshotsRepo.listSnapshotsForProduct).not.toHaveBeenCalled();
+    expect(trendSnapshotsRepo.getTrendSnapshotById).not.toHaveBeenCalled();
     expect(scriptwriterChain).not.toHaveBeenCalled();
     expect(scriptsRepo.createScript).not.toHaveBeenCalled();
 

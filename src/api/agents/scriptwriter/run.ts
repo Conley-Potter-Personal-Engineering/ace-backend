@@ -3,7 +3,7 @@ import {
   ScriptwriterAgentError,
   type ScriptwriterResult,
 } from "@/agents/ScriptwriterAgent";
-import { ScriptRequestSchema } from "@/schemas/agentSchemas";
+import { ScriptWriterInput } from "@/schemas/scriptwriterSchemas";
 import {
   badRequest,
   ok,
@@ -42,7 +42,7 @@ export default async function handler(
   }
 
   try {
-    const input = ScriptRequestSchema.parse(req.body ?? {});
+    const input = ScriptWriterInput.parse(req.body ?? {});
     const agent = new ScriptwriterAgent({ agentName: "ScriptwriterAgent" });
     const result = await agent.run(input);
 

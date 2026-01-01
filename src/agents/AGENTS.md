@@ -30,9 +30,8 @@ Generate structured short-form scripts for products using creative patterns and 
 
 ### Inputs
 • productId  
-• trendSnapshotIds  
-• patternIds  
-• creativeVariables  
+• creativePatternId  
+• trendSnapshotId  
 
 ### Outputs
 • structured script object with title, hook, CTA, outline, body  
