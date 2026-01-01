@@ -1,0 +1,794 @@
+diff --git a/src/api/handlers/agentsHandler.ts b/src/api/handlers/agentsHandler.ts
+index 89cf4628d09423067198862c027638ca07c8ad65..dd7efa1203243e33904c8fc07d27c800a7484f74 100644
+--- a/src/api/handlers/agentsHandler.ts
++++ b/src/api/handlers/agentsHandler.ts
+@@ -1,156 +1,575 @@
+-import { EditorAgent } from "../../agents/EditorAgent";
+-import { ScriptwriterAgent } from "../../agents/ScriptwriterAgent";
++import { z } from "zod";
+ import type BaseAgent from "../../agents/BaseAgent";
++import {
++  EditorAgent,
++  type EditorAgentResult,
++} from "../../agents/EditorAgent";
++import {
++  PublisherAgent,
++  type PublisherAgentResult,
++} from "../../agents/PublisherAgent";
++import {
++  ScriptwriterAgent,
++  type ScriptwriterResult,
++} from "../../agents/ScriptwriterAgent";
++import * as experimentsRepo from "../../repos/experiments";
++import * as productsRepo from "../../repos/products";
++import * as publishedPostsRepo from "../../repos/publishedPosts";
++import * as scriptsRepo from "../../repos/scripts";
+ import { fetchRecentSystemEvents, logSystemEvent } from "../../repos/systemEvents";
+ import {
+   EditorAgentInputSchema,
++  PublishRequestSchema,
+   ScriptwriterAgentInputSchema,
++  type PublishRequest,
+ } from "../../schemas/agentSchemas";
+ import {
+   AgentNameSchema,
+   AgentRunRequestSchema,
++  EditorRenderRequestSchema,
++  PublisherPublishRequestSchema,
++  ScriptwriterGenerateRequestSchema,
+   type AgentName,
++  type EditorRenderRequest,
++  type PublisherPublishRequest,
++  type ScriptwriterGenerateRequest,
+ } from "../../schemas/apiSchemas";
+-import { z } from "zod";
++import {
++  ScriptWriterInput,
++  type ScriptWriterInputType,
++} from "../../schemas/scriptwriterSchemas";
+ 
+ type AgentStatus = "idle" | "running" | "error";
+ 
+ export interface AgentStatusRow {
+   name: string;
+   status: AgentStatus;
+   lastRun: string | null;
+   lastEvent: string | null;
+ }
+ 
+ interface AgentDescriptor {
+   create: () => BaseAgent;
+   inputSchema: z.ZodTypeAny;
+ }
+ 
++export class AgentApiError extends Error {
++  status: number;
++  details?: unknown;
++
++  constructor(message: string, status: number, details?: unknown) {
++    super(message);
++    this.name = "AgentApiError";
++    this.status = status;
++    this.details = details;
++  }
++}
++
+ const agentRegistry: Record<AgentName, AgentDescriptor> = {
+   ScriptwriterAgent: {
+     create: () => new ScriptwriterAgent(),
+     inputSchema: ScriptwriterAgentInputSchema,
+   },
+   EditorAgent: {
+     create: () => new EditorAgent(),
+     inputSchema: EditorAgentInputSchema,
+   },
++  PublisherAgent: {
++    create: () => new PublisherAgent(),
++    inputSchema: PublishRequestSchema,
++  },
+ };
+ 
+ const deriveStatus = (eventType?: string | null): AgentStatus => {
+   if (!eventType) {
+     return "idle";
+   }
+ 
+   if (eventType.includes("error")) {
+     return "error";
+   }
+ 
+   if (eventType.endsWith(".start") || eventType === "start") {
+     return "running";
+   }
+ 
+   return "idle";
+ };
+ 
+ const isNewer = (candidate?: string | null, current?: string | null) => {
+   if (!candidate) {
+     return false;
+   }
+   if (!current) {
+     return true;
+   }
+   return new Date(candidate).getTime() > new Date(current).getTime();
+ };
+ 
++const nowIso = () => new Date().toISOString();
++
++type WorkflowContext = Pick<
++  ScriptwriterGenerateRequest | EditorRenderRequest | PublisherPublishRequest,
++  "workflow_id" | "correlation_id"
++>;
++
++const attachContext = (
++  payload: Record<string, unknown>,
++  context: WorkflowContext,
++) => ({
++  ...payload,
++  workflow_id: context.workflow_id ?? null,
++  correlation_id: context.correlation_id ?? null,
++});
++
++const logLifecycleEvent = async (
++  agentName: AgentName,
++  eventType: string,
++  payload: Record<string, unknown>,
++  context: WorkflowContext,
++) =>
++  logSystemEvent({
++    agent_name: agentName,
++    event_type: eventType,
++    payload: attachContext(payload, context),
++    created_at: nowIso(),
++  });
++
++const getProductOrThrow = async (
++  productId: string,
++  context: WorkflowContext,
++) => {
++  const product = await productsRepo.getProductById(productId);
++
++  if (!product) {
++    throw new AgentApiError(
++      `Product ${productId} not found`,
++      400,
++      attachContext({ product_id: productId }, context),
++    );
++  }
++
++  return product;
++};
++
++const getScriptOrThrow = async (
++  scriptId: string,
++  context: WorkflowContext,
++) => {
++  const script = await scriptsRepo.getScriptById(scriptId);
++
++  if (!script) {
++    throw new AgentApiError(
++      `Script ${scriptId} not found`,
++      400,
++      attachContext({ script_id: scriptId }, context),
++    );
++  }
++
++  return script;
++};
++
++const getExperimentOrThrow = async (
++  experimentId: string,
++  context: WorkflowContext,
++) => {
++  const experiment = await experimentsRepo.getExperimentById(experimentId);
++
++  if (!experiment) {
++    throw new AgentApiError(
++      `Experiment ${experimentId} not found`,
++      400,
++      attachContext({ experiment_id: experimentId }, context),
++    );
++  }
++
++  return experiment;
++};
++
++const deriveVideoFormat = (storagePath?: string | null) => {
++  if (!storagePath) {
++    return "unknown";
++  }
++
++  const extension = storagePath.split(".").pop();
++  return extension || "unknown";
++};
++
+ export const listAgentStatuses = async (): Promise<AgentStatusRow[]> => {
+   const events = await fetchRecentSystemEvents(200);
+   const baseMap = new Map<string, AgentStatusRow>();
+ 
+   Object.keys(agentRegistry).forEach((name) => {
+     baseMap.set(name, {
+       name,
+       status: "idle",
+       lastRun: null,
+       lastEvent: null,
+     });
+   });
+ 
+   events.forEach((event) => {
+     const agentName = event.agent_name ?? null;
+     if (!agentName) {
+       return;
+     }
+ 
+     const current = baseMap.get(agentName) ?? {
+       name: agentName,
+       status: "idle" as AgentStatus,
+       lastRun: null,
+       lastEvent: null,
+     };
+ 
+     if (isNewer(event.created_at, current.lastRun)) {
+       baseMap.set(agentName, {
+         name: agentName,
+         status: deriveStatus(event.event_type),
+         lastRun: event.created_at ?? current.lastRun,
+         lastEvent: event.event_type ?? current.lastEvent,
+       });
+     }
+   });
+ 
+   return Array.from(baseMap.values()).sort((a, b) => a.name.localeCompare(b.name));
+ };
+ 
++const buildScriptwriterInput = (
++  request: ScriptwriterGenerateRequest,
++  productSummary: string,
++): ScriptWriterInputType =>
++  ScriptWriterInput.parse({
++    productId: request.product_id,
++    productSummary,
++    trendSummaries: [],
++    patternSummaries: [],
++    creativeVariables: request.creative_variables ?? {},
++  });
++
++const defaultEditorComposition = {
++  duration: 45,
++  tone: "balanced",
++  layout: "vertical",
++} as const;
++
++export const generateScriptFromApi = async (
++  rawBody: unknown,
++) => {
++  const parsedBody = ScriptwriterGenerateRequestSchema.parse(rawBody ?? {});
++  const context: WorkflowContext = {
++    workflow_id: parsedBody.workflow_id,
++    correlation_id: parsedBody.correlation_id,
++  };
++
++  const product = await getProductOrThrow(parsedBody.product_id, context);
++
++  await logLifecycleEvent(
++    "ScriptwriterAgent",
++    "script.generate.start",
++    { product_id: parsedBody.product_id },
++    context,
++  );
++
++  try {
++    const input = buildScriptwriterInput(
++      parsedBody,
++      product.description ?? product.name ?? "No product summary available",
++    );
++    const result = (await new ScriptwriterAgent().execute(input)) as ScriptwriterResult;
++    const script = result.script;
++
++    if (!script) {
++      throw new AgentApiError(
++        "ScriptwriterAgent returned no script record",
++        500,
++      );
++    }
++
++    await logLifecycleEvent(
++      "ScriptwriterAgent",
++      "script.generate.success",
++      { product_id: script.product_id, script_id: script.script_id },
++      context,
++    );
++
++    return {
++      workflow_id: parsedBody.workflow_id ?? null,
++      correlation_id: parsedBody.correlation_id ?? null,
++      script_id: script.script_id,
++      product_id: script.product_id,
++      script_text: script.script_text ?? "",
++      creative_variables: script.creative_variables ?? null,
++      created_at: script.created_at ?? nowIso(),
++    };
++  } catch (error) {
++    await logLifecycleEvent(
++      "ScriptwriterAgent",
++      "script.generate.error",
++      {
++        product_id: parsedBody.product_id,
++        message: error instanceof Error ? error.message : String(error),
++      },
++      context,
++    );
++
++    if (error instanceof AgentApiError) {
++      throw error;
++    }
++
++    throw new AgentApiError(
++      "Failed to generate script",
++      500,
++      attachContext({ product_id: parsedBody.product_id }, context),
++    );
++  }
++};
++
++export const renderAssetFromApi = async (rawBody: unknown) => {
++  const parsedBody = EditorRenderRequestSchema.parse(rawBody ?? {});
++  const context: WorkflowContext = {
++    workflow_id: parsedBody.workflow_id,
++    correlation_id: parsedBody.correlation_id,
++  };
++
++  const [script, product] = await Promise.all([
++    getScriptOrThrow(parsedBody.script_id, context),
++    getProductOrThrow(parsedBody.product_id, context),
++  ]);
++
++  if (script.product_id && script.product_id !== parsedBody.product_id) {
++    throw new AgentApiError(
++      `script_id ${parsedBody.script_id} does not belong to product ${parsedBody.product_id}`,
++      400,
++      attachContext(
++        {
++          script_id: parsedBody.script_id,
++          product_id: parsedBody.product_id,
++        },
++        context,
++      ),
++    );
++  }
++
++  await logLifecycleEvent(
++    "EditorAgent",
++    "video.render.start",
++    {
++      script_id: parsedBody.script_id,
++      product_id: parsedBody.product_id,
++    },
++    context,
++  );
++
++  try {
++    const agentInput = {
++      scriptId: parsedBody.script_id,
++      composition: defaultEditorComposition,
++      renderBackend: "supabase",
++    };
++    const result = (await new EditorAgent().execute(agentInput)) as EditorAgentResult;
++    const persisted = result.persistedAsset;
++
++    if (!persisted) {
++      throw new AgentApiError("EditorAgent returned no persisted asset", 500);
++    }
++
++    const storageUrl = persisted.storage_path ?? result.storageUrl;
++
++    await logLifecycleEvent(
++      "EditorAgent",
++      "video.render.success",
++      {
++        asset_id: persisted.asset_id,
++        script_id: persisted.script_id ?? parsedBody.script_id,
++        product_id: product.product_id ?? parsedBody.product_id,
++      },
++      context,
++    );
++
++    return {
++      workflow_id: parsedBody.workflow_id ?? null,
++      correlation_id: parsedBody.correlation_id ?? null,
++      asset_id: persisted.asset_id,
++      script_id: persisted.script_id ?? parsedBody.script_id,
++      product_id: product.product_id ?? parsedBody.product_id,
++      storage_url: storageUrl,
++      format: deriveVideoFormat(storageUrl),
++      metadata: result.metadata ?? {},
++      created_at: persisted.created_at ?? nowIso(),
++    };
++  } catch (error) {
++    await logLifecycleEvent(
++      "EditorAgent",
++      "video.render.error",
++      {
++        script_id: parsedBody.script_id,
++        product_id: parsedBody.product_id,
++        message: error instanceof Error ? error.message : String(error),
++      },
++      context,
++    );
++
++    if (error instanceof AgentApiError) {
++      throw error;
++    }
++
++    throw new AgentApiError(
++      "Failed to render asset",
++      500,
++      attachContext(
++        {
++          script_id: parsedBody.script_id,
++          product_id: parsedBody.product_id,
++        },
++        context,
++      ),
++    );
++  }
++};
++
++export const publishExperimentPostFromApi = async (rawBody: unknown) => {
++  const parsedBody = PublisherPublishRequestSchema.parse(rawBody ?? {});
++  const context: WorkflowContext = {
++    workflow_id: parsedBody.workflow_id,
++    correlation_id: parsedBody.correlation_id,
++  };
++
++  const experiment = await getExperimentOrThrow(parsedBody.experiment_id, context);
++
++  await logLifecycleEvent(
++    "PublisherAgent",
++    "publish.start",
++    { experiment_id: parsedBody.experiment_id, platform: parsedBody.platform },
++    context,
++  );
++
++  try {
++    const agentInput: PublishRequest = {
++      experimentId: parsedBody.experiment_id,
++      assetId: experiment.asset_id ?? undefined,
++      scriptId: experiment.script_id ?? undefined,
++      productId: experiment.product_id ?? undefined,
++      platforms: [{ platform: parsedBody.platform }],
++    };
++
++    const result = (await new PublisherAgent().execute(agentInput)) as PublisherAgentResult;
++    const publishResult = result.results[0];
++
++    if (!publishResult) {
++      throw new AgentApiError(
++        "PublisherAgent returned no publish results",
++        500,
++      );
++    }
++
++    const post = await publishedPostsRepo.createPublishedPost({
++      experiment_id: parsedBody.experiment_id,
++      platform: publishResult.platform,
++      platform_post_id: publishResult.externalId,
++      posted_at: publishResult.publishedAt,
++      caption: null,
++      hashtags: null,
++      created_at: nowIso(),
++    });
++
++    await logLifecycleEvent(
++      "PublisherAgent",
++      "publish.success",
++      {
++        experiment_id: parsedBody.experiment_id,
++        platform: parsedBody.platform,
++        post_id: post.post_id,
++      },
++      context,
++    );
++
++    return {
++      workflow_id: parsedBody.workflow_id ?? null,
++      correlation_id: parsedBody.correlation_id ?? null,
++      post_id: post.post_id,
++      experiment_id: parsedBody.experiment_id,
++      platform: post.platform,
++      external_post_id: post.platform_post_id ?? publishResult.externalId,
++      published_at: post.posted_at ?? publishResult.publishedAt,
++    };
++  } catch (error) {
++    await logLifecycleEvent(
++      "PublisherAgent",
++      "publish.error",
++      {
++        experiment_id: parsedBody.experiment_id,
++        platform: parsedBody.platform,
++        message: error instanceof Error ? error.message : String(error),
++      },
++      context,
++    );
++
++    if (error instanceof AgentApiError) {
++      throw error;
++    }
++
++    throw new AgentApiError(
++      "Failed to publish experiment post",
++      500,
++      attachContext(
++        {
++          experiment_id: parsedBody.experiment_id,
++          platform: parsedBody.platform,
++        },
++        context,
++      ),
++    );
++  }
++};
++
+ export const triggerAgentRun = async (
+   agentName: string,
+   rawBody: unknown,
+ ) => {
+   const validatedName = AgentNameSchema.parse(agentName);
+   const agent = agentRegistry[validatedName];
+ 
+   if (!agent) {
+     throw new Error(`Agent ${validatedName} is not registered`);
+   }
+ 
+   const parsedBody = AgentRunRequestSchema.parse(rawBody ?? {});
+   const parsedInput = agent.inputSchema.parse(parsedBody.input ?? {});
+-  const startedAt = new Date().toISOString();
++  const startedAt = nowIso();
+ 
+   await logSystemEvent({
+     agent_name: validatedName,
+     event_type: "agent.start",
+     payload: { trigger: "manual_api", input: parsedInput },
+     created_at: startedAt,
+   });
+ 
+   try {
+     const result = await agent.create().execute(parsedInput);
+ 
+     await logSystemEvent({
+       agent_name: validatedName,
+       event_type: "agent.success",
+       payload: { trigger: "manual_api", input: parsedInput },
+-      created_at: new Date().toISOString(),
++      created_at: nowIso(),
+     });
+ 
+     return {
+       message: `Agent ${validatedName} started`,
+       result,
+     };
+   } catch (error) {
+     await logSystemEvent({
+       agent_name: validatedName,
+       event_type: "agent.error",
+       payload: {
+         trigger: "manual_api",
+         input: parsedInput,
+         message: error instanceof Error ? error.message : String(error),
+       },
+-      created_at: new Date().toISOString(),
++      created_at: nowIso(),
+     });
+ 
+     throw error;
+   }
+ };
+
+diff --git a/src/pages/api/agents/editor/render.ts b/src/pages/api/agents/editor/render.ts
+new file mode 100644
+index 0000000000000000000000000000000000000000..afa5fff2baa915abaf59b5aa79928322f6beaed4
+--- /dev/null
++++ b/src/pages/api/agents/editor/render.ts
+@@ -0,0 +1,34 @@
++import { handleApiError } from "../../../../../api/error";
++import {
++  badRequest,
++  methodNotAllowed,
++  ok,
++  serverError,
++  type ApiRequest,
++  type ApiResponseLike,
++} from "../../../../../api/http";
++import {
++  AgentApiError,
++  renderAssetFromApi,
++} from "../../../../../api/handlers/agentsHandler";
++
++export default async function handler(
++  req: ApiRequest,
++  res: ApiResponseLike,
++) {
++  if (req.method !== "POST") {
++    return methodNotAllowed(res, ["POST"]);
++  }
++
++  try {
++    const data = await renderAssetFromApi(req.body ?? {});
++    return ok(res, { success: true, data });
++  } catch (error) {
++    if (error instanceof AgentApiError) {
++      return error.status === 400
++        ? badRequest(res, error.message, error.details)
++        : serverError(res, error.message, error.details);
++    }
++    return handleApiError(res, error, "render asset");
++  }
++}
+
+diff --git a/src/pages/api/agents/publisher/publish.ts b/src/pages/api/agents/publisher/publish.ts
+new file mode 100644
+index 0000000000000000000000000000000000000000..63acce868169a1738521d0efe3d90cacfd4f5b61
+--- /dev/null
++++ b/src/pages/api/agents/publisher/publish.ts
+@@ -0,0 +1,34 @@
++import { handleApiError } from "../../../../../api/error";
++import {
++  badRequest,
++  methodNotAllowed,
++  ok,
++  serverError,
++  type ApiRequest,
++  type ApiResponseLike,
++} from "../../../../../api/http";
++import {
++  AgentApiError,
++  publishExperimentPostFromApi,
++} from "../../../../../api/handlers/agentsHandler";
++
++export default async function handler(
++  req: ApiRequest,
++  res: ApiResponseLike,
++) {
++  if (req.method !== "POST") {
++    return methodNotAllowed(res, ["POST"]);
++  }
++
++  try {
++    const data = await publishExperimentPostFromApi(req.body ?? {});
++    return ok(res, { success: true, data });
++  } catch (error) {
++    if (error instanceof AgentApiError) {
++      return error.status === 400
++        ? badRequest(res, error.message, error.details)
++        : serverError(res, error.message, error.details);
++    }
++    return handleApiError(res, error, "publish experiment post");
++  }
++}
+
+diff --git a/src/pages/api/agents/scriptwriter/generate.ts b/src/pages/api/agents/scriptwriter/generate.ts
+new file mode 100644
+index 0000000000000000000000000000000000000000..d3d906c1cb6c506e948e1decdce1d88260652728
+--- /dev/null
++++ b/src/pages/api/agents/scriptwriter/generate.ts
+@@ -0,0 +1,34 @@
++import { handleApiError } from "../../../../../api/error";
++import {
++  badRequest,
++  methodNotAllowed,
++  ok,
++  serverError,
++  type ApiRequest,
++  type ApiResponseLike,
++} from "../../../../../api/http";
++import {
++  AgentApiError,
++  generateScriptFromApi,
++} from "../../../../../api/handlers/agentsHandler";
++
++export default async function handler(
++  req: ApiRequest,
++  res: ApiResponseLike,
++) {
++  if (req.method !== "POST") {
++    return methodNotAllowed(res, ["POST"]);
++  }
++
++  try {
++    const data = await generateScriptFromApi(req.body ?? {});
++    return ok(res, { success: true, data });
++  } catch (error) {
++    if (error instanceof AgentApiError) {
++      return error.status === 400
++        ? badRequest(res, error.message, error.details)
++        : serverError(res, error.message, error.details);
++    }
++    return handleApiError(res, error, "generate script");
++  }
++}
+
+diff --git a/src/schemas/apiSchemas.ts b/src/schemas/apiSchemas.ts
+index e8ad72d237fe669d5210dbdac03e022e1377ef98..a7d8addb938a0c7aa43cba2e2489daf03cd63b23 100644
+--- a/src/schemas/apiSchemas.ts
++++ b/src/schemas/apiSchemas.ts
+@@ -1,55 +1,79 @@
+ import { z } from "zod";
+ 
+ export const AgentNameSchema = z.enum([
+   "ScriptwriterAgent",
+   "EditorAgent",
++  "PublisherAgent",
+ ]);
+ 
+ export const AgentRunRequestSchema = z.object({
+   input: z.unknown(),
+ });
+ 
++const WorkflowContextSchema = z.object({
++  workflow_id: z.string().uuid("workflow_id must be a valid UUID").optional(),
++  correlation_id: z.string().uuid("correlation_id must be a valid UUID").optional(),
++});
++
++export const ScriptwriterGenerateRequestSchema = WorkflowContextSchema.extend({
++  product_id: z.string().uuid("product_id must be a valid UUID"),
++  creative_variables: z.record(z.any()).default({}),
++});
++
++export const EditorRenderRequestSchema = WorkflowContextSchema.extend({
++  script_id: z.string().uuid("script_id must be a valid UUID"),
++  product_id: z.string().uuid("product_id must be a valid UUID"),
++});
++
++export const PublisherPublishRequestSchema = WorkflowContextSchema.extend({
++  experiment_id: z.string().uuid("experiment_id must be a valid UUID"),
++  platform: z.enum(["youtube", "tiktok", "instagram", "facebook", "linkedin", "x"]),
++});
++
+ export const WorkflowIdSchema = z.enum([
+   "content-cycle",
+   "trend-refresh",
+   "publish-only",
+   "optimization-cycle",
+   "analytics-ingestion",
+ ]);
+ 
+ export const WorkflowStartRequestSchema = z.object({
+   input: z.unknown().optional(),
+ });
+ 
+ export const ArtifactsQuerySchema = z.object({
+   type: z.enum(["video_prompt"]).optional(),
+   limit: z.coerce.number().int().positive().max(100).optional(),
+ });
+ 
+ export const ArtifactIdSchema = z.string().uuid("id must be a valid UUID");
+ 
+ export const FeedbackRequestSchema = z.object({
+   artifact_id: z.string().uuid("artifact_id must be a valid UUID"),
+   rating: z.number().int().min(1).max(5),
+   comment: z.string().trim().min(1, "comment is required"),
+ });
+ 
+ export const SystemEventsQuerySchema = z.object({
+   limit: z.coerce.number().int().positive().max(200).optional(),
+ });
+ 
+ export const LoginRequestSchema = z.object({
+   email: z.string().email("email must be valid"),
+   password: z.string().min(6, "password is required"),
+ });
+ 
+ export const SignupRequestSchema = z.object({
+   email: z.string().email("email must be valid"),
+   password: z.string().min(6, "password is required"),
+ });
+ 
+ export type AgentName = z.infer<typeof AgentNameSchema>;
+ export type WorkflowId = z.infer<typeof WorkflowIdSchema>;
+ export type FeedbackRequest = z.infer<typeof FeedbackRequestSchema>;
+ export type LoginRequest = z.infer<typeof LoginRequestSchema>;
+ export type SignupRequest = z.infer<typeof SignupRequestSchema>;
++export type ScriptwriterGenerateRequest = z.infer<typeof ScriptwriterGenerateRequestSchema>;
++export type EditorRenderRequest = z.infer<typeof EditorRenderRequestSchema>;
++export type PublisherPublishRequest = z.infer<typeof PublisherPublishRequestSchema>;
