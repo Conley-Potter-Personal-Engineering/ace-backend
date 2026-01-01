@@ -217,18 +217,18 @@ describeIf("ScriptwriterAgent integration", () => {
       .spyOn(scriptwriterChainModule, "scriptwriterChain")
       .mockResolvedValue(structuredScript);
 
-    const product = await productsRepo.createProduct({
-      product_id: productId,
-      name: "Integration Product",
-      description: "Integration product description",
-      source_platform: "integration",
-      category: "testing",
-      created_at: new Date().toISOString(),
-      updated_at: new Date().toISOString(),
-      affiliate_link: null,
-      image_url: null,
-      meta: null,
-    });
+    // const product = await productsRepo.createProduct({
+    //   product_id: productId,
+    //   name: "Integration Product",
+    //   description: "Integration product description",
+    //   source_platform: "integration",
+    //   category: "testing",
+    //   created_at: new Date().toISOString(),
+    //   updated_at: new Date().toISOString(),
+    //   affiliate_link: null,
+    //   image_url: null,
+    //   meta: null,
+    // });
 
     const creativePatternId = "8c76f6dd-44c3-4d4c-9c28-0d2b6c4c1e62";
     const trendSnapshotId = "2b6f0c45-cf59-4f43-b88b-8b7e0c8f44ef";
