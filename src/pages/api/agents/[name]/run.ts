@@ -31,10 +31,6 @@ export default async function handler(
 
   try {
     const result = await triggerAgentRun(name, req.body ?? {});
-    if ("error" in result) {
-      return badRequest(res, result.error, result.details);
-    }
-
     return created(res, {
       success: true,
       message: result.message,

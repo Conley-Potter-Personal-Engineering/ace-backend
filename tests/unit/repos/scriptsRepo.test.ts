@@ -43,6 +43,11 @@ describe("scriptsRepo.createScript", () => {
       productId: script.product_id!,
       scriptText: script.script_text,
       hook: script.hook!,
+      creativeVariables: {
+        emotion: "excited",
+        structure: "story",
+        style: "direct",
+      },
       creativePatternId,
       trendReference,
       createdAt: script.created_at!,
@@ -64,6 +69,11 @@ describe("scriptsRepo.createScript", () => {
         productId: "c20c2bc8-f124-4f22-bbf8-1fa44b1f9d05",
         scriptText: "body",
         hook: "hook",
+        creativeVariables: {
+          emotion: "curious",
+          structure: "problem-solution",
+          style: "playful",
+        },
         creativePatternId: "0d7717d4-5e2d-4f9f-99b0-5c0c3aa8059d",
         trendReference: null,
       }),

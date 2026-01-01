@@ -1,45 +1,17 @@
 import { z } from "zod";
-import { ProductSchema } from "./productsSchema";
-import { CreativePatternSchema } from "./patternsSchema";
-import { TrendSnapshotSchema } from "./trendsSchema";
+ 
 
 export const ScriptwriterAgentInputSchema = z.object({
   productId: z.string().uuid("productId must be a valid UUID"),
-  warmupNotes: z.array(z.string().trim().min(1)).optional(),
-});
-
-export type ScriptwriterAgentInput = z.infer<typeof ScriptwriterAgentInputSchema>;
-
-export const ScriptRequestSchema = z.object({
-  product: ProductSchema,
-  pattern: CreativePatternSchema.nullable(),
-  trend: TrendSnapshotSchema.nullable(),
-  workflow_id: z.string().uuid(),
-  correlation_id: z.string().uuid().optional(),
-});
-
-export type ScriptRequest = z.infer<typeof ScriptRequestSchema>;
-
-export const ScriptWriterInput = z.object({
-  productId: z.string().uuid("productId must be a valid UUID"),
-  productSummary: z.string().trim().min(1, "Product summary is required"),
   creativePatternId: z.string().uuid("creativePatternId must be a valid UUID"),
-  trendSnapshotIds: z.array(z.string().uuid()).optional().default([]),
-  trendSummaries: z.array(z.string().trim().min(1)).default([]),
+  trendSnapshotId: z.string().uuid("trendSnapshotId must be a valid UUID"),
 });
 
-export type ScriptWriterInputType = z.infer<typeof ScriptWriterInput>;
-
-export const ScriptwriterAgentInputSchema = z
-  .object({
-    productId: z.string().uuid("productId must be a valid UUID"),
-    productSummary: z.string().trim().min(1, "Product summary is required"),
-    creativePatternId: z.string().uuid("creativePatternId must be a valid UUID"),
-    trendSnapshotIds: z.array(z.string().uuid()).optional().default([]),
-  })
-  .strict();
-
 export type ScriptwriterAgentInput = z.infer<typeof ScriptwriterAgentInputSchema>;
+
+export const ScriptWriterInput = ScriptwriterAgentInputSchema;
+
+export type ScriptWriterInputType = ScriptwriterAgentInput;
 
 export const ScriptOutput = z.object({
   title: z.string(),

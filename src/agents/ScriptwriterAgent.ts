@@ -9,19 +9,12 @@ import * as creativePatternsRepo from "@/repos/creativePatterns";
 import * as productsRepo from "@/repos/products";
 import * as scriptsRepo from "@/repos/scripts";
 import * as trendSnapshotsRepo from "@/repos/trendSnapshots";
-import { ScriptwriterAgentInputSchema } from "@/schemas/agentSchemas";
-import {
-  ScriptRequestSchema,
-  ScriptwriterAgentInputSchema,
-  type ScriptRequest,
-  type ScriptwriterAgentInput,
-} from "@/schemas/agentSchemas";
 import {
   ScriptOutput,
+  ScriptWriterInput,
   type ScriptOutputType,
   type ScriptWriterInputType,
 } from "@/schemas/scriptwriterSchemas";
-import { randomUUID } from "crypto";
 import { ZodError } from "zod";
 import BaseAgent from "./BaseAgent";
 
@@ -71,30 +64,7 @@ interface WorkflowContext {
   trendSnapshotId: string | null;
 }
 
-type ScriptwriterResolvedInput =
-  | { type: "entity"; payload: ScriptRequest }
-  | { type: "summary"; payload: ScriptWriterInputType }
-  | { type: "legacy"; payload: ScriptwriterAgentInput };
-
-const summarizePattern = (pattern: CreativePattern): string => {
-  const style = (pattern.style_tags ?? []).join(", ") || "no style tags";
-  const emotion = (pattern.emotion_tags ?? []).join(", ") || "no emotion tags";
-  const structure = pattern.structure ?? "unspecified structure";
-  const hook = pattern.hook_text ?? "no hook provided";
-  const notes = pattern.notes ?? "no notes provided";
-  const observed_performance = pattern.observed_performance ?? "no observed performance provided";
-
-
-  return `Pattern ${pattern.pattern_id}: structure=${structure}; style=${style}; emotion=${emotion}; hook="${hook}; notes=${notes}; observed_performance=${observed_performance}"`;
-};
-
-const summarizeTrend = (snapshot: TrendSnapshot): string => {
-  const tags = (snapshot.tiktok_trend_tags ?? []).join(", ") || "no tags";
-  const velocity = snapshot.velocity_score ?? "n/a";
-  const popularity = snapshot.popularity_score ?? "n/a";
-
-  return `Trend ${snapshot.snapshot_id}: tags=${tags}; velocity=${velocity}; popularity=${popularity}`;
-};
+ 
 
 const formatScriptText = (output: ScriptOutputType): string => {
   const outline = output.outline.length
@@ -119,28 +89,18 @@ const pickFirst = (values: string[] | null | undefined, fallback: string): strin
   values && values.length ? values[0] : fallback;
 
 const buildCreativeVariables = ({
-  baseVariables,
   pattern,
   trend,
 }: {
-  baseVariables?: Record<string, string>;
   pattern?: CreativePattern | null;
   trend?: TrendSnapshot | null;
-}): CreativeVariables => {
-  const base = baseVariables ?? {};
-  const emotion = base.emotion ?? pickFirst(pattern?.emotion_tags, "inspiring");
-  const structure = base.structure ?? pattern?.structure ?? "problem-solution";
-  const style = base.style ?? pickFirst(pattern?.style_tags, "direct");
-
-  return {
-    ...base,
-    emotion,
-    structure,
-    style,
-    patternUsed: pattern?.pattern_id ?? null,
-    trendReference: trend?.snapshot_id ?? null,
-  };
-};
+}): CreativeVariables => ({
+  emotion: pickFirst(pattern?.emotion_tags, "inspiring"),
+  structure: pattern?.structure ?? "problem-solution",
+  style: pickFirst(pattern?.style_tags, "direct"),
+  patternUsed: pattern?.pattern_id ?? null,
+  trendReference: trend?.snapshot_id ?? null,
+});
 
 export class ScriptwriterAgent extends BaseAgent {
   constructor({ agentName = "ScriptwriterAgent" } = {}) {
@@ -153,11 +113,8 @@ export class ScriptwriterAgent extends BaseAgent {
     await this.logEvent("script.generate.start", { ...baseContext, input: rawInput });
 
     try {
-      const resolvedInput = this.resolveInput(rawInput);
-      const execution =
-        resolvedInput.type === "entity"
-          ? await this.generateFromEntityInput(resolvedInput.payload, baseContext)
-          : await this.generateFromSummaryInput(resolvedInput.payload);
+      const validatedInput = ScriptWriterInput.parse(rawInput);
+      const execution = await this.generateFromInput(validatedInput);
 
       const successContext = execution.context;
 
@@ -188,37 +145,14 @@ export class ScriptwriterAgent extends BaseAgent {
   }
 
   private extractWorkflowContext(rawInput: unknown): WorkflowContext {
-    const requestParse = ScriptRequestSchema.safeParse(rawInput);
-    if (requestParse.success) {
-      const correlationId = requestParse.data.correlation_id ?? randomUUID();
-      return {
-        workflow_id: requestParse.data.workflow_id,
-        correlation_id: correlationId,
-        productId: requestParse.data.product.product_id,
-        patternId: requestParse.data.pattern?.pattern_id ?? null,
-        trendSnapshotId: requestParse.data.trend?.snapshot_id ?? null,
-      };
-    }
-
     const summaryParse = ScriptWriterInput.safeParse(rawInput);
     if (summaryParse.success) {
       return {
         workflow_id: null,
         correlation_id: null,
         productId: summaryParse.data.productId,
-        patternId: null,
-        trendSnapshotId: null,
-      };
-    }
-
-    const legacyParse = ScriptwriterAgentInputSchema.safeParse(rawInput);
-    if (legacyParse.success) {
-      return {
-        workflow_id: null,
-        correlation_id: null,
-        productId: legacyParse.data.productId,
-        patternId: null,
-        trendSnapshotId: null,
+        patternId: summaryParse.data.creativePatternId,
+        trendSnapshotId: summaryParse.data.trendSnapshotId,
       };
     }
 
@@ -229,29 +163,6 @@ export class ScriptwriterAgent extends BaseAgent {
       patternId: null,
       trendSnapshotId: null,
     };
-  }
-
-  private resolveInput(rawInput: unknown): ScriptwriterResolvedInput {
-    const requestParse = ScriptRequestSchema.safeParse(rawInput);
-    if (requestParse.success) {
-      return { type: "entity", payload: requestParse.data };
-    }
-
-    const summaryParse = ScriptWriterInput.safeParse(rawInput);
-    if (summaryParse.success) {
-      return { type: "summary", payload: summaryParse.data };
-    }
-
-    const legacyParse = ScriptwriterAgentInputSchema.safeParse(rawInput);
-    if (legacyParse.success) {
-      return { type: "legacy", payload: legacyParse.data };
-    }
-
-    throw new ScriptwriterAgentError(
-      "Scriptwriter input failed validation.",
-      "VALIDATION",
-      summaryParse.error,
-    );
   }
 
   private normalizeError(error: unknown): ScriptwriterAgentError {
@@ -271,104 +182,47 @@ export class ScriptwriterAgent extends BaseAgent {
     return new ScriptwriterAgentError(message, "UNKNOWN", error);
   }
 
-  private async generateFromEntityInput(
-    payload: ScriptRequest,
-    baseContext?: WorkflowContext,
+  private async generateFromInput(
+    input: ScriptWriterInputType,
   ): Promise<{ result: ScriptwriterResult; context: WorkflowContext }> {
-    const correlationId =
-      payload.correlation_id ?? baseContext?.correlation_id ?? randomUUID();
-    const context: WorkflowContext = {
-      workflow_id: payload.workflow_id,
-      correlation_id: correlationId,
-      productId: payload.product.product_id,
-      patternId: payload.pattern?.pattern_id ?? null,
-      trendSnapshotId: payload.trend?.snapshot_id ?? null,
-    };
+    const product = await this.ensureProduct(input.productId);
 
-    const product = await this.ensureProduct(payload.product.product_id);
-
-    const structuredScript = await this.runScriptwriterChain({
-      product: payload.product,
-      pattern: payload.pattern,
-      trend: payload.trend,
-    });
-
-    const creativeVariables = buildCreativeVariables({
-      pattern: payload.pattern,
-      trend: payload.trend,
-    });
-
-    const createdScript = await this.persistScript({
-      productId: product.product_id,
-      structuredScript,
-      creativeVariables,
-    });
-
-    await agentNotesRepo.createAgentNote({
-      agent_name: this.agentName,
-      topic: "script_generation_rationale",
-      content: [
-        `Script generated for ${product.name ?? product.product_id}.`,
-        `Pattern used: ${payload.pattern?.pattern_id ?? "none"}; Trend reference: ${
-          payload.trend?.snapshot_id ?? "none"
-        }.`,
-        `Creative variables: ${JSON.stringify(creativeVariables)}`,
-        `CTA: ${structuredScript.cta}`,
-      ].join("\n"),
-      importance: 0.7,
-      embedding: null,
-      created_at: this.now(),
-    });
-
-    return { result: createdScript, context };
-  }
-
-  private async generateFromSummaryInput(
-    payload: ScriptWriterInputType | ScriptwriterAgentInput,
-  ): Promise<{ result: ScriptwriterResult; context: WorkflowContext }> {
-    const summaryInput = await this.normalizeSummaryInput(payload);
-    const product = await this.ensureProduct(summaryInput.productId);
-
-    const [creativePatterns, trendSnapshots] = await Promise.all([
-      creativePatternsRepo.listPatternsForProduct(summaryInput.productId),
-      trendSnapshotsRepo.listSnapshotsForProduct(summaryInput.productId),
+    const [patternUsed, trendReference] = await Promise.all([
+      creativePatternsRepo.getCreativePatternById(input.creativePatternId),
+      trendSnapshotsRepo.getTrendSnapshotById(input.trendSnapshotId),
     ]);
 
-    const resolvedPatternSummaries = summaryInput.patternSummaries.length
-      ? summaryInput.patternSummaries
-      : creativePatterns.map(summarizePattern);
+    if (!patternUsed) {
+      throw new ScriptwriterAgentError(
+        `Creative pattern ${input.creativePatternId} not found`,
+        "NOT_FOUND",
+      );
+    }
 
-    const resolvedTrendSummaries = summaryInput.trendSummaries.length
-      ? summaryInput.trendSummaries
-      : trendSnapshots.map(summarizeTrend);
+    if (!trendReference) {
+      throw new ScriptwriterAgentError(
+        `Trend snapshot ${input.trendSnapshotId} not found`,
+        "NOT_FOUND",
+      );
+    }
 
-    const chainInput: ScriptWriterInputType = {
-      productId: summaryInput.productId,
-      productSummary:
-        summaryInput.productSummary ||
-        product.description ||
-        product.name ||
-        "No product summary available.",
-      patternSummaries: resolvedPatternSummaries,
-      trendSummaries: resolvedTrendSummaries,
-      creativeVariables: summaryInput.creativeVariables ?? {},
-    };
-
-    const structuredScript = await this.runScriptwriterChain(chainInput);
-
-    const patternUsed = creativePatterns[0] ?? null;
-    const trendReference = trendSnapshots[0] ?? null;
+    const structuredScript = await this.runScriptwriterChain({
+      product,
+      pattern: patternUsed,
+      trend: trendReference,
+    });
 
     const creativeVariables = buildCreativeVariables({
-      baseVariables: summaryInput.creativeVariables,
       pattern: patternUsed,
       trend: trendReference,
     });
 
     const createdScript = await this.persistScript({
-      productId: summaryInput.productId,
+      productId: input.productId,
       structuredScript,
       creativeVariables,
+      creativePatternId: patternUsed?.pattern_id ?? input.creativePatternId,
+      trendReference: trendReference?.snapshot_id ?? input.trendSnapshotId,
     });
 
     await agentNotesRepo.createAgentNote({
@@ -392,33 +246,11 @@ export class ScriptwriterAgent extends BaseAgent {
       context: {
         workflow_id: null,
         correlation_id: null,
-        productId: summaryInput.productId,
+        productId: input.productId,
         patternId: patternUsed?.pattern_id ?? null,
         trendSnapshotId: trendReference?.snapshot_id ?? null,
       },
     };
-  }
-
-  private async normalizeSummaryInput(
-    payload: ScriptWriterInputType | ScriptwriterAgentInput,
-  ): Promise<ScriptWriterInputType> {
-    if ("productSummary" in payload) {
-      return payload;
-    }
-
-    const product = await this.ensureProduct(payload.productId);
-    const warmupNotes = payload.warmupNotes?.filter(Boolean) ?? [];
-
-    return ScriptWriterInput.parse({
-      productId: payload.productId,
-      productSummary:
-        product.description || product.name || "No product summary available.",
-      patternSummaries: [],
-      trendSummaries: [],
-      creativeVariables: warmupNotes.length
-        ? { warmupNotes: warmupNotes.join(" | ") }
-        : {},
-    });
   }
 
   private async ensureProduct(productId: string): Promise<Product> {
@@ -461,17 +293,22 @@ export class ScriptwriterAgent extends BaseAgent {
     productId,
     structuredScript,
     creativeVariables,
+    creativePatternId,
+    trendReference,
   }: {
     productId: string;
     structuredScript: ScriptOutputType;
     creativeVariables: CreativeVariables;
+    creativePatternId: string | null;
+    trendReference: string | null;
   }): Promise<ScriptwriterResult> {
     try {
       const createdScript = await scriptsRepo.createScript({
         productId,
         scriptText: formatScriptText(structuredScript),
         hook: structuredScript.hook,
-        creativePatternId: input.creativePatternId,
+        creativeVariables,
+        creativePatternId,
         trendReference,
         createdAt: this.now(),
       });

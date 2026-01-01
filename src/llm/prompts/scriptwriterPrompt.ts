@@ -1,30 +1,38 @@
 import { z } from "zod";
-import { ProductSchema } from "@/schemas/productsSchema";
-import { CreativePatternSchema } from "@/schemas/patternsSchema";
-import { TrendSnapshotSchema } from "@/schemas/trendsSchema";
-import { ScriptWriterInput } from "@/schemas/scriptwriterSchemas";
-
-const ScriptwriterEntityInputSchema = z.object({
-  product: ProductSchema,
-  pattern: CreativePatternSchema.nullable(),
-  trend: TrendSnapshotSchema.nullable(),
+const ProductPromptSchema = z.object({
+  product_id: z.string(),
+  name: z.string().nullable().optional(),
+  description: z.string().nullable().optional(),
+  category: z.string().nullable().optional(),
+  meta: z.any().nullable().optional(),
 });
 
-const ScriptwriterSummaryInputSchema = ScriptWriterInput;
+const CreativePatternPromptSchema = z.object({
+  pattern_id: z.string(),
+  structure: z.string().nullable().optional(),
+  hook_text: z.string().nullable().optional(),
+  style_tags: z.array(z.string()).nullable().optional(),
+  emotion_tags: z.array(z.string()).nullable().optional(),
+  observed_performance: z.any().nullable().optional(),
+});
 
-export const ScriptwriterPromptInputSchema = z.union([
-  ScriptwriterEntityInputSchema,
-  ScriptwriterSummaryInputSchema,
-]);
+const TrendSnapshotPromptSchema = z.object({
+  snapshot_id: z.string(),
+  tiktok_trend_tags: z.array(z.string()).nullable().optional(),
+  velocity_score: z.number().nullable().optional(),
+  popularity_score: z.number().nullable().optional(),
+});
+const ScriptwriterEntityInputSchema = z.object({
+  product: ProductPromptSchema,
+  pattern: CreativePatternPromptSchema.nullable(),
+  trend: TrendSnapshotPromptSchema.nullable(),
+});
+
+export const ScriptwriterPromptInputSchema = ScriptwriterEntityInputSchema;
 
 export type ScriptwriterPromptInput = z.infer<typeof ScriptwriterPromptInputSchema>;
 
 type ScriptwriterEntityInput = z.infer<typeof ScriptwriterEntityInputSchema>;
-type ScriptwriterSummaryInput = z.infer<typeof ScriptwriterSummaryInputSchema>;
-
-const isEntityInput = (
-  input: ScriptwriterPromptInput,
-): input is ScriptwriterEntityInput => "product" in input;
 
 const pushListSection = (
   sections: string[],
@@ -57,18 +65,24 @@ const buildEntitySections = (
   sections.push("");
 
   const meta = product.meta ?? null;
-  if (meta) {
-    const keyFeatures = formatMetaList(meta.key_features);
+  if (meta && typeof meta === "object") {
+    const keyFeatures = formatMetaList(
+      (meta as { key_features?: string[] }).key_features,
+    );
     if (keyFeatures.length) {
       pushListSection(sections, "## Key Features", keyFeatures, "None provided.");
     }
 
-    const demoIdeas = formatMetaList(meta.demo_ideas);
+    const demoIdeas = formatMetaList(
+      (meta as { demo_ideas?: string[] }).demo_ideas,
+    );
     if (demoIdeas.length) {
       pushListSection(sections, "## Demo Ideas", demoIdeas, "None provided.");
     }
 
-    const objections = formatMetaList(meta.objections);
+    const objections = formatMetaList(
+      (meta as { objections?: string[] }).objections,
+    );
     if (objections.length) {
       pushListSection(
         sections,
@@ -78,7 +92,9 @@ const buildEntitySections = (
       );
     }
 
-    const compliance = formatMetaList(meta.compliance);
+    const compliance = formatMetaList(
+      (meta as { compliance?: string[] }).compliance,
+    );
     if (compliance.length) {
       pushListSection(
         sections,
@@ -122,41 +138,6 @@ const buildEntitySections = (
   sections.push("");
 };
 
-const buildSummarySections = (
-  input: ScriptwriterSummaryInput,
-  sections: string[],
-): void => {
-  sections.push("# Product Context");
-  sections.push(`Product: ${input.productId}`);
-  sections.push(`Description: ${input.productSummary}`);
-  sections.push("Category: N/A");
-  sections.push("");
-
-  pushListSection(
-    sections,
-    "# Creative Pattern Summaries",
-    input.patternSummaries ?? [],
-    "No creative patterns provided.",
-  );
-
-  pushListSection(
-    sections,
-    "# Trend Summaries",
-    input.trendSummaries ?? [],
-    "No trend summaries provided.",
-  );
-
-  const creativeVariables = Object.entries(input.creativeVariables ?? {}).map(
-    ([key, value]) => `${key}: ${value}`,
-  );
-  pushListSection(
-    sections,
-    "# Creative Variables",
-    creativeVariables,
-    "No creative variables provided.",
-  );
-};
-
 export const buildScriptwriterPrompt = (
   rawInput: ScriptwriterPromptInput,
 ): string => {
@@ -168,11 +149,7 @@ export const buildScriptwriterPrompt = (
     "",
   ];
 
-  if (isEntityInput(input)) {
-    buildEntitySections(input, sections);
-  } else {
-    buildSummarySections(input, sections);
-  }
+  buildEntitySections(input, sections);
 
   sections.push("# Output Format");
   sections.push("Return JSON with:");

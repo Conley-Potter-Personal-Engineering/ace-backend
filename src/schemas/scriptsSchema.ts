@@ -14,6 +14,8 @@ export const ScriptInsertSchema = z.object({
   scriptText: z.string().trim().min(1, "Script text is required"),
   hook: z.string().trim().min(1, "Hook is required"),
   creativeVariables: CreativeVariablesSchema,
+  creativePatternId: z.string().uuid().nullable().optional(),
+  trendReference: z.string().uuid().nullable().optional(),
   createdAt: z.string().datetime().nullable().optional(),
 });
 
