@@ -38,8 +38,12 @@ vi.mock("../../../src/utils/veoVideoGenerator", () => ({
   default: generateVideoWithVeoMock,
 }));
 
-vi.mock("../../../src/utils/storageUploader", () => ({
-  storageUploader: vi.fn(async () => mockStorageUrl),
+vi.mock("../../../src/repos/storage", () => ({
+  uploadRenderedVideo: vi.fn(async () => ({
+    url: mockStorageUrl,
+    backend: "supabase",
+    attempts: 1,
+  })),
 }));
 
 vi.mock("../../../src/repos/scripts", () => ({
@@ -76,7 +80,7 @@ vi.mock("../../../src/repos/systemEvents", () => ({
 
 const { logSystemEvent } = await import("../../../src/repos/systemEvents");
 const { generateVideoWithVeo } = await import("../../../src/utils/veoVideoGenerator");
-const { storageUploader } = await import("../../../src/utils/storageUploader");
+const { uploadRenderedVideo } = await import("../../../src/repos/storage");
 const { create: createVideoAsset } = await import("../../../src/repos/videoAssets");
 const { EditorAgent } = await import("../../../src/agents/EditorAgent");
 
@@ -96,12 +100,18 @@ describe("EditorAgent", () => {
     });
 
     const expectedPrompt =
-      "Generate a 42-second energetic video in montage style about: A concise short-form cut.";
+      "Generate a 42-second energetic video in montage layout about: A concise short-form cut.";
 
     expect(generateVideoWithVeo).toHaveBeenCalledWith(expectedPrompt, {
       duration: 42,
     });
-    expect(storageUploader).toHaveBeenCalledWith(mockVideoBuffer, "supabase");
+    expect(uploadRenderedVideo).toHaveBeenCalledWith(
+      expect.objectContaining({
+        file: mockVideoBuffer,
+        backend: "supabase",
+        key: "videos/rendered/mock.mp4",
+      }),
+    );
     expect(createVideoAsset).toHaveBeenCalledWith(
       expect.objectContaining({
         scriptId: mockScript.script_id,
@@ -118,7 +128,10 @@ describe("EditorAgent", () => {
     );
     expect(loggedEvents).toContain("agent.start");
     expect(loggedEvents).toContain("video.render.start");
+    expect(loggedEvents).toContain("video.render.progress");
+    expect(loggedEvents).toContain("video.assets.uploaded");
     expect(loggedEvents).toContain("video.render.success");
+    expect(loggedEvents).toContain("video.assets.created");
     expect(loggedEvents).toContain("video.generate.start");
     expect(loggedEvents).toContain("video.generate.success");
     expect(loggedEvents).toContain("agent.success");

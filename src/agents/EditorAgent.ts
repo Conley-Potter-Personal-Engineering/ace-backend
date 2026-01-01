@@ -56,8 +56,12 @@ export class EditorAgentError extends Error {
   }
 }
 
+export interface EditorAgentInit extends EditorAgentConfig {
+  agentName?: string;
+}
+
 export class EditorAgent extends BaseAgent {
-  constructor({ agentName = "EditorAgent", ...config }: EditorAgentConfig = {}) {
+  constructor({ agentName = "EditorAgent", ...config }: EditorAgentInit = {}) {
     super(agentName, config);
   }
 
