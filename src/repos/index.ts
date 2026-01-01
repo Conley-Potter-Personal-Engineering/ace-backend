@@ -7,6 +7,7 @@ export * from "./products";
 export * from "./publishedPosts";
 export * from "./rawVideos";
 export * from "./scripts";
+export * from "./storage";
 export * from "./systemEvents";
 export * from "./trendSnapshots";
 export * from "./videoAssets";

@@ -51,6 +51,28 @@ export const EditorChainOutputSchema = z.object({
 
 export type EditorChainOutput = z.infer<typeof EditorChainOutputSchema>;
 
+export const StyleTemplateSchema = z.object({
+  name: z.string().trim().min(1, "Template name is required"),
+  colors: z.object({
+    primary: z.string().trim().min(1, "Primary color is required"),
+    secondary: z.string().trim().min(1, "Secondary color is required"),
+    background: z.string().trim().min(1, "Background color is required"),
+  }),
+  fonts: z.object({
+    title: z.string().trim().min(1, "Title font is required"),
+    body: z.string().trim().min(1, "Body font is required"),
+  }),
+  transitions: z.array(z.string().trim().min(1)).default([]),
+  branding: z
+    .object({
+      logoUrl: z.string().url("logoUrl must be a valid URL").optional(),
+      watermarkText: z.string().trim().min(1).optional(),
+    })
+    .optional(),
+});
+
+export type StyleTemplate = z.infer<typeof StyleTemplateSchema>;
+
 export const EditorRequestSchema = z.object({
   scriptId: z.string().uuid("scriptId must be a valid UUID"),
   composition: z.object({
@@ -59,6 +81,7 @@ export const EditorRequestSchema = z.object({
     layout: z.string().trim().min(1, "Layout is required"),
   }),
   styleTemplateId: z.string().trim().min(1).optional(),
+  styleTemplate: StyleTemplateSchema.optional(),
   renderBackend: z
     .enum(["local", "s3", "supabase"])
     .default("supabase"),
