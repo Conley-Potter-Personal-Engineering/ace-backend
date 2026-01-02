@@ -3,13 +3,13 @@ import editorChain, {
 } from "@/llm/chains/editorChain";
 import * as scriptsRepo from "@/repos/scripts";
 import * as storageRepo from "@/repos/storage";
+import * as styleTemplatesRepo from "@/repos/styleTemplatesRepo";
 import * as videoAssetsRepo from "@/repos/videoAssets";
 import {
   EditorRequestSchema,
   EditorChainOutputSchema,
   type EditorChainOutput,
   type EditorRequest,
-  StyleTemplateSchema,
   type StyleTemplate,
   VideoAssetSchema,
   type VideoAsset,
@@ -27,7 +27,6 @@ export interface EditorAgentResult {
 }
 
 export interface EditorAgentConfig extends BaseAgentConfig {
-  styleTemplates?: Record<string, unknown>;
   defaultStorageBackend?: "supabase" | "s3";
 }
 
@@ -72,7 +71,10 @@ export class EditorAgent extends BaseAgent {
 
     try {
       const input = EditorRequestSchema.parse(rawInput);
-      const styleTemplate = this.resolveStyleTemplate(input);
+      const styleTemplate = await this.loadStyleTemplate(
+        input.styleTemplateId,
+        baseContext,
+      );
 
       const script = await scriptsRepo.findById(input.scriptId);
       if (!script) {
@@ -92,6 +94,7 @@ export class EditorAgent extends BaseAgent {
         scriptText: script.script_text ?? "",
         composition: input.composition,
         styleTemplateId: input.styleTemplateId,
+        styleTemplate,
       });
 
       const validatedChain = this.parseChainOutput(chainResult);
@@ -222,34 +225,27 @@ export class EditorAgent extends BaseAgent {
     return params.styleTemplateId ? [params.styleTemplateId] : [];
   }
 
-  private resolveStyleTemplate(input: EditorRequest): StyleTemplate | null {
-    if (input.styleTemplate) {
-      if (
-        input.styleTemplateId &&
-        input.styleTemplateId !== input.styleTemplate.name
-      ) {
-        throw new EditorAgentError(
-          "styleTemplateId must match styleTemplate.name when both are provided",
-          "VALIDATION",
-        );
-      }
-      return input.styleTemplate;
+  private async loadStyleTemplate(
+    styleTemplateId: string | undefined,
+    context: { scriptId: string | null; styleTemplateId: string | null },
+  ): Promise<StyleTemplate | null> {
+    if (!styleTemplateId) {
+      return null;
     }
 
-    const templates = (this.config as EditorAgentConfig).styleTemplates;
-    if (
-      input.styleTemplateId &&
-      templates &&
-      typeof templates === "object" &&
-      input.styleTemplateId in templates
-    ) {
-      const candidate = (templates as Record<string, unknown>)[
-        input.styleTemplateId
-      ];
-      return StyleTemplateSchema.parse(candidate);
+    const template = await styleTemplatesRepo.findById(styleTemplateId);
+    if (!template) {
+      await this.logEvent("style_template.not_found", {
+        ...context,
+        styleTemplateId,
+      });
+      throw new EditorAgentError(
+        `Style template ${styleTemplateId} not found`,
+        "NOT_FOUND",
+      );
     }
 
-    return null;
+    return template;
   }
 
   private resolveStorageBackend(
@@ -364,13 +360,20 @@ export class EditorAgent extends BaseAgent {
     scriptText,
     composition,
     styleTemplateId,
+    styleTemplate,
   }: {
     scriptText: string;
     composition: EditorRequest["composition"];
     styleTemplateId?: string;
+    styleTemplate: StyleTemplate | null;
   }): Promise<EditorChainInvocationOutput> {
     try {
-      return await editorChain(scriptText, composition, styleTemplateId);
+      return await editorChain(
+        scriptText,
+        composition,
+        styleTemplateId,
+        styleTemplate,
+      );
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);
       throw new EditorAgentError(message, "CHAIN_FAILED", error);

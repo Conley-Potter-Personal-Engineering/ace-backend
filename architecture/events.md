@@ -65,12 +65,13 @@ The taxonomy is divided into the following categories:
 1. workflow  
 2. script  
 3. video  
-4. publish  
-5. experiment  
-6. analytics  
-7. trends  
-8. agent  
-9. engine  
+4. style_template  
+5. publish  
+6. experiment  
+7. analytics  
+8. trends  
+9. agent  
+10. engine  
 
 Each category is detailed below.
 
@@ -147,7 +148,25 @@ video.render.success { assetId: ... }
 
 ---
 
-# 4. publish events
+# 4. style_template events
+
+Events emitted by style template creation and usage.
+
+### Lifecycle
+• style_template.created  
+• style_template.updated  
+• style_template.deleted  
+• style_template.not_found  
+
+### Examples
+```
+style_template.created { templateId: ... }
+style_template.not_found { styleTemplateId: ... }
+```
+
+---
+
+# 5. publish events
 
 Events emitted by the Publisher Agent.
 
@@ -168,7 +187,7 @@ publish.success { postId: ..., externalPostId: ... }
 
 ---
 
-# 5. experiment events
+# 6. experiment events
 
 Events related to experiment creation and assignment.
 
@@ -184,7 +203,7 @@ experiment.create.success { experimentId: ... }
 
 ---
 
-# 6. analytics events
+# 7. analytics events
 
 Events related to performance ingestion and analysis.
 
@@ -205,7 +224,7 @@ analytics.ingest.success { postId: ... }
 
 ---
 
-# 7. trends events
+# 8. trends events
 
 Events emitted by the Trend Research Agent.
 
@@ -225,7 +244,7 @@ trends.refresh.success { productId: ... }
 
 ---
 
-# 8. agent events
+# 9. agent events
 
 General purpose agent level events.
 
@@ -244,7 +263,7 @@ agent.error { agentName: "Scriptwriter", message: "...", stack: "..." }
 
 ---
 
-# 9. engine events
+# 10. engine events
 
 Engine wide events not tied to a specific agent.
 
