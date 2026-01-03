@@ -2,18 +2,22 @@ import editorChain, {
   type EditorChainInvocationOutput,
 } from "@/llm/chains/editorChain";
 import * as scriptsRepo from "@/repos/scripts";
-import * as video_assetsRepo from "@/repos/videoAssets";
+import * as storageRepo from "@/repos/storage";
+import * as styleTemplatesRepo from "@/repos/styleTemplatesRepo";
+import * as videoAssetsRepo from "@/repos/videoAssets";
 import {
   EditorRequestSchema,
   EditorChainOutputSchema,
+  type EditorChainOutput,
   type EditorRequest,
+  type StyleTemplate,
   VideoAssetSchema,
   type VideoAsset,
 } from "@/schemas/editorSchemas";
-import { storageUploader } from "@/utils/storageUploader";
 import generateVideoWithVeo from "@/utils/veoVideoGenerator";
 import type { Tables } from "@/db/types";
-import BaseAgent from "./BaseAgent";
+import BaseAgent, { type BaseAgentConfig } from "./BaseAgent";
+import { ZodError } from "zod";
 
 export interface EditorAgentResult {
   asset: VideoAsset;
@@ -22,45 +26,84 @@ export interface EditorAgentResult {
   storageUrl: string;
 }
 
+export interface EditorAgentConfig extends BaseAgentConfig {
+  defaultStorageBackend?: "supabase" | "s3";
+}
+
+export type EditorAgentErrorCode =
+  | "VALIDATION"
+  | "NOT_FOUND"
+  | "CHAIN_FAILED"
+  | "RENDER_FAILED"
+  | "UPLOAD_FAILED"
+  | "PERSISTENCE"
+  | "UNKNOWN";
+
+export class EditorAgentError extends Error {
+  code: EditorAgentErrorCode;
+  cause?: unknown;
+
+  constructor(
+    message: string,
+    code: EditorAgentErrorCode = "UNKNOWN",
+    cause?: unknown,
+  ) {
+    super(message);
+    this.name = "EditorAgentError";
+    this.code = code;
+    this.cause = cause;
+  }
+}
+
+export interface EditorAgentInit extends EditorAgentConfig {
+  agentName?: string;
+}
+
 export class EditorAgent extends BaseAgent {
-  constructor({ agentName = "EditorAgent" } = {}) {
-    super(agentName);
+  constructor({ agentName = "EditorAgent", ...config }: EditorAgentInit = {}) {
+    super(agentName, config);
   }
 
   async run(rawInput: unknown): Promise<EditorAgentResult> {
-    await this.logEvent("agent.start", { input: rawInput });
-    await this.logEvent("video.render.start", { input: rawInput });
-
-    let renderPlanPrepared = false;
-    let agentErrorLogged = false;
+    const baseContext = this.extractWorkflowContext(rawInput);
+    await this.logEvent("agent.start", { ...baseContext, input: rawInput });
+    await this.logEvent("video.render.start", { ...baseContext, input: rawInput });
 
     try {
       const input = EditorRequestSchema.parse(rawInput);
+      const styleTemplate = await this.loadStyleTemplate(
+        input.styleTemplateId,
+        baseContext,
+      );
 
       const script = await scriptsRepo.findById(input.scriptId);
       if (!script) {
-        throw new Error(`Script ${input.scriptId} not found`);
+        throw new EditorAgentError(
+          `Script ${input.scriptId} not found`,
+          "NOT_FOUND",
+        );
       }
 
       await this.logEvent("context.script_loaded", {
+        ...baseContext,
         scriptId: script.script_id,
         productId: script.product_id,
       });
 
-      const chainResult = await editorChain(
-        script.script_text ?? "",
-        input.composition,
-        input.styleTemplateId,
-      );
-
-      const validatedChain = EditorChainOutputSchema.parse({
-        storagePath: chainResult.storagePath,
-        durationSeconds: chainResult.durationSeconds,
-        thumbnailPath: chainResult.thumbnailPath,
-        metadata: chainResult.metadata,
+      const chainResult = await this.runEditorChain({
+        scriptText: script.script_text ?? "",
+        composition: input.composition,
+        styleTemplateId: input.styleTemplateId,
+        styleTemplate,
       });
 
-      const styleTags = this.deriveStyleTags(chainResult.styleTags, input.styleTemplateId);
+      const validatedChain = this.parseChainOutput(chainResult);
+
+      const styleTags = this.deriveStyleTags({
+        chainStyleTags: chainResult.styleTags,
+        styleTemplateId: input.styleTemplateId,
+        styleTemplate,
+      });
       const renderPlan = {
         title: validatedChain.metadata.title,
         scriptSummary: validatedChain.metadata.summary,
@@ -70,84 +113,66 @@ export class EditorAgent extends BaseAgent {
         styleTags,
       };
 
-      renderPlanPrepared = true;
-
-      await this.logEvent("video.render.success", {
+      await this.logEvent("video.render.progress", {
+        ...baseContext,
         scriptId: input.scriptId,
-        storagePath: validatedChain.storagePath,
+        stage: "plan_ready",
         duration: renderPlan.duration,
         styleTags,
-        metadata: validatedChain.metadata,
       });
 
-      let videoBuffer: Buffer | null = null;
-      let generationMetadata: { duration?: number; format: string } | null = null;
+      const generationResult = await this.generateVideo({
+        renderPlan,
+        scriptId: input.scriptId,
+        styleTemplate,
+      });
 
-      try {
-        await this.logEvent("video.generate.start", {
-          scriptId: input.scriptId,
-          tone: renderPlan.tone,
-          layout: renderPlan.layout,
-        });
+      await this.logEvent("video.render.progress", {
+        ...baseContext,
+        scriptId: input.scriptId,
+        stage: "generated",
+        duration: generationResult.metadata.duration ?? renderPlan.duration,
+      });
 
-        const prompt = `Generate a ${renderPlan.duration}-second ${renderPlan.tone} video in ${renderPlan.layout} style about: ${
-          renderPlan.scriptSummary || renderPlan.title
-        }.`;
-        const generationResult = await generateVideoWithVeo(prompt, {
-          duration: renderPlan.duration,
-        });
-        videoBuffer = generationResult.buffer;
-        generationMetadata = generationResult.metadata;
+      const resolvedBackend = this.resolveStorageBackend(input.renderBackend);
+      const uploadResult = await this.uploadRenderedVideo({
+        buffer: generationResult.buffer,
+        backend: resolvedBackend,
+        storagePath: validatedChain.storagePath,
+      });
 
-        await this.logEvent("video.generate.success", {
-          scriptId: input.scriptId,
-          duration: generationMetadata.duration,
-          size: generationResult.buffer.length,
-          format: generationMetadata.format,
-        });
-      } catch (generationError) {
-        const message =
-          generationError instanceof Error ? generationError.message : String(generationError);
-        await this.logEvent("video.generate.error", {
-          scriptId: input.scriptId,
-          message,
-        });
-        await this.logEvent("agent.error", {
-          scriptId: input.scriptId,
-          message,
-        });
-        agentErrorLogged = true;
-        throw generationError;
-      }
+      const storageUrl = uploadResult.url;
 
-      if (!videoBuffer || !generationMetadata) {
-        throw new Error("Video generation failed: Missing video buffer or metadata");
-      }
+      await this.logEvent("video.assets.uploaded", {
+        ...baseContext,
+        scriptId: input.scriptId,
+        storageUrl,
+        backend: uploadResult.backend,
+        attempts: uploadResult.attempts,
+      });
 
-      const storageUrl = await this.uploadWithRetry(
-        videoBuffer,
-        input.renderBackend,
-        input.scriptId,
-      );
+      await this.logEvent("video.render.success", {
+        ...baseContext,
+        scriptId: input.scriptId,
+        storagePath: validatedChain.storagePath,
+        duration: generationResult.metadata.duration ?? renderPlan.duration,
+        styleTags,
+        storageUrl,
+      });
 
       const assetPayload = VideoAssetSchema.parse({
         scriptId: input.scriptId,
         storageUrl,
-        duration: generationMetadata.duration ?? renderPlan.duration,
+        duration: generationResult.metadata.duration ?? renderPlan.duration,
         tone: renderPlan.tone,
         layout: renderPlan.layout,
         styleTags: renderPlan.styleTags,
       });
 
-      const { asset, record } = await video_assetsRepo.create(assetPayload);
-
-      await this.logEvent("video.assets.uploaded", {
-        scriptId: input.scriptId,
-        storageUrl,
-        backend: input.renderBackend,
-      });
+      const { asset, record } = await this.persistVideoAsset(assetPayload);
 
       await this.logEvent("video.assets.created", {
+        ...baseContext,
         assetId: record.asset_id,
         scriptId: input.scriptId,
         storagePath: record.storage_path,
@@ -155,6 +180,7 @@ export class EditorAgent extends BaseAgent {
       });
 
       await this.logEvent("agent.success", {
+        ...baseContext,
         scriptId: input.scriptId,
         assetId: record.asset_id,
       });
@@ -166,76 +192,278 @@ export class EditorAgent extends BaseAgent {
         storageUrl,
       };
     } catch (error) {
-      const message = error instanceof Error ? error.message : String(error);
-      const scriptId = (rawInput as Record<string, unknown> | null)?.scriptId ?? null;
-
-      if (!renderPlanPrepared) {
-        await this.logEvent("video.render.error", {
-          scriptId,
-          message,
-        });
-      }
-
-      if (!agentErrorLogged) {
-        await this.logEvent("agent.error", {
-          scriptId,
-          message,
-        });
-      }
-      return this.handleError("EditorAgent.run", error);
+      const normalizedError = this.normalizeError(error);
+      await this.logEvent("video.render.error", {
+        ...baseContext,
+        message: normalizedError.message,
+        code: normalizedError.code,
+      });
+      await this.logEvent("agent.error", {
+        ...baseContext,
+        message: normalizedError.message,
+        code: normalizedError.code,
+      });
+      return this.handleError("EditorAgent.run", normalizedError);
     }
   }
 
   private deriveStyleTags(
-    chainStyleTags: string[] | undefined,
-    styleTemplateId: string | undefined,
+    params: {
+      chainStyleTags: string[] | undefined;
+      styleTemplateId: string | undefined;
+      styleTemplate: StyleTemplate | null;
+    },
   ): string[] {
-    if (chainStyleTags?.length) {
-      return chainStyleTags;
+    if (params.chainStyleTags?.length) {
+      return params.chainStyleTags;
     }
 
-    return styleTemplateId ? [styleTemplateId] : [];
-  }
-
-  private resolveBackend(
-    backend: EditorRequest["renderBackend"],
-  ): "supabase" | "s3" {
-    return backend === "local" ? "supabase" : backend;
-  }
-
-  private async uploadWithRetry(
-    file: Buffer,
-    backend: EditorRequest["renderBackend"],
-    scriptId: string,
-  ): Promise<string> {
-    const maxAttempts = 3;
-    const baseDelayMs = 500;
-    let attempt = 0;
-
-    while (attempt < maxAttempts) {
-      try {
-        return await storageUploader(file, this.resolveBackend(backend));
-      } catch (error) {
-        attempt += 1;
-        const message = error instanceof Error ? error.message : String(error);
-
-        if (attempt >= maxAttempts) {
-          throw new Error(`Upload failed after ${attempt} attempts: ${message}`);
-        }
-
-        await this.logEvent("system.retry", {
-          scriptId,
-          backend,
-          attempt,
-          message,
-        });
-
-        const delay = baseDelayMs * 2 ** (attempt - 1);
-        await this.sleep(delay);
-      }
+    if (params.styleTemplate?.name) {
+      return [params.styleTemplate.name];
     }
 
-    throw new Error("Upload retry logic exhausted unexpectedly");
+    return params.styleTemplateId ? [params.styleTemplateId] : [];
+  }
+
+  private async loadStyleTemplate(
+    styleTemplateId: string | undefined,
+    context: { scriptId: string | null; styleTemplateId: string | null },
+  ): Promise<StyleTemplate | null> {
+    if (!styleTemplateId) {
+      return null;
+    }
+
+    const template = await styleTemplatesRepo.findById(styleTemplateId);
+    if (!template) {
+      await this.logEvent("style_template.not_found", {
+        ...context,
+        styleTemplateId,
+      });
+      throw new EditorAgentError(
+        `Style template ${styleTemplateId} not found`,
+        "NOT_FOUND",
+      );
+    }
+
+    return template;
+  }
+
+  private resolveStorageBackend(
+    backend: EditorRequest["renderBackend"],
+  ): storageRepo.StorageUploadBackend {
+    if (backend !== "local") {
+      return backend;
+    }
+
+    if ((this.config as EditorAgentConfig).defaultStorageBackend === "s3") {
+      return "s3";
+    }
+
+    return "supabase";
+  }
+
+  private formatStyleTemplate(styleTemplate: StyleTemplate): string {
+    const transitions = styleTemplate.transitions.length
+      ? `Transitions: ${styleTemplate.transitions.join(", ")}.`
+      : "Transitions: none.";
+    const brandingBits = [
+      styleTemplate.branding?.logoUrl
+        ? `Logo: ${styleTemplate.branding.logoUrl}.`
+        : null,
+      styleTemplate.branding?.watermarkText
+        ? `Watermark: ${styleTemplate.branding.watermarkText}.`
+        : null,
+    ].filter(Boolean);
+    const branding =
+      brandingBits.length > 0 ? `Branding: ${brandingBits.join(" ")}` : "";
+    return [
+      `Style template "${styleTemplate.name}".`,
+      `Colors: primary ${styleTemplate.colors.primary}, secondary ${styleTemplate.colors.secondary}, background ${styleTemplate.colors.background}.`,
+      `Fonts: title ${styleTemplate.fonts.title}, body ${styleTemplate.fonts.body}.`,
+      transitions,
+      branding,
+    ]
+      .filter((part) => part.length > 0)
+      .join(" ");
+  }
+
+  private buildVideoPrompt({
+    renderPlan,
+    styleTemplate,
+  }: {
+    renderPlan: {
+      title: string;
+      scriptSummary: string;
+      tone: string;
+      layout: string;
+      duration: number;
+    };
+    styleTemplate: StyleTemplate | null;
+  }): string {
+    const basePrompt = `Generate a ${renderPlan.duration}-second ${renderPlan.tone} video in ${renderPlan.layout} layout about: ${
+      renderPlan.scriptSummary || renderPlan.title
+    }.`;
+    if (!styleTemplate) {
+      return basePrompt;
+    }
+
+    return `${basePrompt} ${this.formatStyleTemplate(styleTemplate)}`;
+  }
+
+  private async generateVideo({
+    renderPlan,
+    scriptId,
+    styleTemplate,
+  }: {
+    renderPlan: {
+      title: string;
+      scriptSummary: string;
+      tone: string;
+      layout: string;
+      duration: number;
+    };
+    scriptId: string;
+    styleTemplate: StyleTemplate | null;
+  }): Promise<{ buffer: Buffer; metadata: { duration?: number; format: string } }> {
+    await this.logEvent("video.generate.start", {
+      scriptId,
+      tone: renderPlan.tone,
+      layout: renderPlan.layout,
+      duration: renderPlan.duration,
+    });
+
+    try {
+      const prompt = this.buildVideoPrompt({ renderPlan, styleTemplate });
+      const generationResult = await generateVideoWithVeo(prompt, {
+        duration: renderPlan.duration,
+      });
+
+      await this.logEvent("video.generate.success", {
+        scriptId,
+        duration: generationResult.metadata.duration,
+        size: generationResult.buffer.length,
+        format: generationResult.metadata.format,
+      });
+
+      return generationResult;
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      await this.logEvent("video.generate.error", {
+        scriptId,
+        message,
+      });
+      throw new EditorAgentError(message, "RENDER_FAILED", error);
+    }
+  }
+
+  private async runEditorChain({
+    scriptText,
+    composition,
+    styleTemplateId,
+    styleTemplate,
+  }: {
+    scriptText: string;
+    composition: EditorRequest["composition"];
+    styleTemplateId?: string;
+    styleTemplate: StyleTemplate | null;
+  }): Promise<EditorChainInvocationOutput> {
+    try {
+      return await editorChain(
+        scriptText,
+        composition,
+        styleTemplateId,
+        styleTemplate,
+      );
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      throw new EditorAgentError(message, "CHAIN_FAILED", error);
+    }
+  }
+
+  private parseChainOutput(
+    output: EditorChainInvocationOutput,
+  ): EditorChainOutput {
+    try {
+      return EditorChainOutputSchema.parse({
+        storagePath: output.storagePath,
+        durationSeconds: output.durationSeconds,
+        thumbnailPath: output.thumbnailPath,
+        metadata: output.metadata,
+      });
+    } catch (error) {
+      throw new EditorAgentError(
+        "Editor chain output failed validation.",
+        "CHAIN_FAILED",
+        error,
+      );
+    }
+  }
+
+  private async uploadRenderedVideo({
+    buffer,
+    backend,
+    storagePath,
+  }: {
+    buffer: Buffer;
+    backend: storageRepo.StorageUploadBackend;
+    storagePath: string;
+  }): Promise<storageRepo.UploadRenderedVideoResult> {
+    try {
+      return await storageRepo.uploadRenderedVideo({
+        file: buffer,
+        backend,
+        key: storagePath,
+      });
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      throw new EditorAgentError(message, "UPLOAD_FAILED", error);
+    }
+  }
+
+  private async persistVideoAsset(
+    payload: VideoAsset,
+  ): Promise<videoAssetsRepo.CreatedVideoAsset> {
+    try {
+      return await videoAssetsRepo.create(payload);
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      throw new EditorAgentError(message, "PERSISTENCE", error);
+    }
+  }
+
+  private extractWorkflowContext(rawInput: unknown): {
+    scriptId: string | null;
+    styleTemplateId: string | null;
+  } {
+    const parsed = EditorRequestSchema.safeParse(rawInput);
+    if (parsed.success) {
+      return {
+        scriptId: parsed.data.scriptId,
+        styleTemplateId: parsed.data.styleTemplateId ?? null,
+      };
+    }
+
+    return {
+      scriptId: null,
+      styleTemplateId: null,
+    };
+  }
+
+  private normalizeError(error: unknown): EditorAgentError {
+    if (error instanceof EditorAgentError) {
+      return error;
+    }
+
+    if (error instanceof ZodError) {
+      return new EditorAgentError(
+        "Editor input failed validation.",
+        "VALIDATION",
+        error,
+      );
+    }
+
+    const message = error instanceof Error ? error.message : String(error);
+    return new EditorAgentError(message, "UNKNOWN", error);
   }
 }
 

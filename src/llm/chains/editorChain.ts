@@ -8,7 +8,7 @@ import {
   buildEditorPrompt,
   type EditorPromptInput,
 } from "../prompts/editorPrompt";
-import { type EditorRequest } from "../../schemas/editorSchemas";
+import { type EditorRequest, type StyleTemplate } from "../../schemas/editorSchemas";
 
 interface RunEditorChainParams {
   scriptText: string;
@@ -82,8 +82,10 @@ export interface EditorChainInvocationOutput extends EditorChainResult {
 const buildMockVideo = (
   composition: EditorRequest["composition"],
   styleTemplateId?: string,
+  styleTemplate?: StyleTemplate | null,
 ): string => {
-  const styleLabel = styleTemplateId ?? "default-style";
+  const styleLabel =
+    styleTemplate?.name ?? styleTemplateId ?? "default-style";
   return [
     `duration=${composition.duration}`,
     `tone=${composition.tone}`,
@@ -92,8 +94,12 @@ const buildMockVideo = (
   ].join("|");
 };
 
-const defaultStorageHint = (styleTemplateId?: string): string => {
-  const safeStyle = styleTemplateId?.replace(/\s+/g, "-").toLowerCase() ?? "default";
+const defaultStorageHint = (
+  styleTemplateId?: string,
+  styleTemplate?: StyleTemplate | null,
+): string => {
+  const label = styleTemplate?.name ?? styleTemplateId ?? "default";
+  const safeStyle = label.replace(/\s+/g, "-").toLowerCase();
   return `videos/rendered/${safeStyle}.mp4`;
 };
 
@@ -101,19 +107,27 @@ export default async function editorChain(
   scriptContent: string,
   composition: EditorRequest["composition"],
   styleTemplateId?: string,
+  styleTemplate?: StyleTemplate | null,
 ): Promise<EditorChainInvocationOutput> {
   const baseResult = await runEditorChain({
     scriptText: scriptContent,
-    creativeVariables: composition,
-    storagePathHint: defaultStorageHint(styleTemplateId),
+    creativeVariables: {
+      ...composition,
+      styleTemplate: styleTemplate ?? undefined,
+    },
+    storagePathHint: defaultStorageHint(styleTemplateId, styleTemplate),
   });
 
-  const styleTags = styleTemplateId ? [styleTemplateId] : [];
+  const styleTags = styleTemplate?.name
+    ? [styleTemplate.name]
+    : styleTemplateId
+    ? [styleTemplateId]
+    : [];
 
   return {
     ...baseResult,
     durationSeconds: baseResult.durationSeconds ?? composition.duration,
     styleTags,
-    mockVideo: buildMockVideo(composition, styleTemplateId),
+    mockVideo: buildMockVideo(composition, styleTemplateId, styleTemplate),
   };
 }
