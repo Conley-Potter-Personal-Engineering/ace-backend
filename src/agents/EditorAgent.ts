@@ -263,7 +263,7 @@ export class EditorAgent extends BaseAgent {
   }
 
   private formatStyleTemplate(styleTemplate: StyleTemplate): string {
-    const transitions = styleTemplate.transitions.length
+    const transitions = styleTemplate.transitions?.length
       ? `Transitions: ${styleTemplate.transitions.join(", ")}.`
       : "Transitions: none.";
     const brandingBits = [
@@ -300,9 +300,8 @@ export class EditorAgent extends BaseAgent {
     };
     styleTemplate: StyleTemplate | null;
   }): string {
-    const basePrompt = `Generate a ${renderPlan.duration}-second ${renderPlan.tone} video in ${renderPlan.layout} layout about: ${
-      renderPlan.scriptSummary || renderPlan.title
-    }.`;
+    const basePrompt = `Generate a ${renderPlan.duration}-second ${renderPlan.tone} video in ${renderPlan.layout} layout about: ${renderPlan.scriptSummary || renderPlan.title
+      }.`;
     if (!styleTemplate) {
       return basePrompt;
     }

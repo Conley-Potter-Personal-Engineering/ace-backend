@@ -22,14 +22,16 @@ const WorkflowContextCamelSchema = z.object({
 
 const normalizeWorkflowContext = (
   value: z.infer<typeof WorkflowContextSchema> | z.infer<typeof WorkflowContextCamelSchema>,
-) => ({
-  workflow_id:
-    "workflow_id" in value ? value.workflow_id ?? undefined : value.workflowId ?? undefined,
-  correlation_id:
-    "correlation_id" in value
-      ? value.correlation_id ?? undefined
-      : value.correlationId ?? undefined,
-});
+) => {
+  const snake = value as z.infer<typeof WorkflowContextSchema>;
+  const camel = value as z.infer<typeof WorkflowContextCamelSchema>;
+
+  return {
+    workflow_id: "workflow_id" in value ? snake.workflow_id : camel.workflowId,
+    correlation_id:
+      "correlation_id" in value ? snake.correlation_id : camel.correlationId,
+  };
+};
 
 const ScriptwriterGenerateSnakeSchema = WorkflowContextSchema.extend({
   product_id: z.string().uuid("product_id must be a valid UUID"),
@@ -45,14 +47,20 @@ const ScriptwriterGenerateCamelSchema = WorkflowContextCamelSchema.extend({
 
 export const ScriptwriterGenerateRequestSchema = z
   .union([ScriptwriterGenerateSnakeSchema, ScriptwriterGenerateCamelSchema])
-  .transform((value) => ({
-    ...normalizeWorkflowContext(value),
-    product_id: "product_id" in value ? value.product_id : value.productId,
-    creative_pattern_id:
-      "creative_pattern_id" in value ? value.creative_pattern_id : value.creativePatternId,
-    trend_snapshot_id:
-      "trend_snapshot_id" in value ? value.trend_snapshot_id : value.trendSnapshotId,
-  }));
+  .transform((value) => {
+    const productId = "product_id" in value ? value.product_id : value.productId;
+    const creativePatternId =
+      "creative_pattern_id" in value ? value.creative_pattern_id : value.creativePatternId;
+    const trendSnapshotId =
+      "trend_snapshot_id" in value ? value.trend_snapshot_id : value.trendSnapshotId;
+
+    return {
+      ...normalizeWorkflowContext(value),
+      product_id: productId,
+      creative_pattern_id: creativePatternId,
+      trend_snapshot_id: trendSnapshotId,
+    };
+  });
 
 const EditorRenderSnakeSchema = WorkflowContextSchema.extend({
   script_id: z.string().uuid("script_id must be a valid UUID"),
@@ -64,15 +72,23 @@ const EditorRenderCamelSchema = WorkflowContextCamelSchema.extend({
   overrideStoragePath: z.string().trim().min(1).optional(),
 });
 
-export const EditorRenderRequestSchema = z.union([EditorRenderSnakeSchema, EditorRenderCamelSchema])
-  .transform((value) => ({
-    ...normalizeWorkflowContext(value),
-    script_id: "script_id" in value ? value.script_id : value.scriptId,
-    override_storage_path:
+export const EditorRenderRequestSchema = z
+  .union([EditorRenderSnakeSchema, EditorRenderCamelSchema])
+  .transform((value) => {
+    const snake = value as z.infer<typeof EditorRenderSnakeSchema>;
+    const camel = value as z.infer<typeof EditorRenderCamelSchema>;
+    const scriptId = "script_id" in value ? snake.script_id : camel.scriptId;
+    const overrideStoragePath =
       "override_storage_path" in value
-        ? value.override_storage_path
-        : value.overrideStoragePath ?? undefined,
-  }));
+        ? snake.override_storage_path
+        : camel.overrideStoragePath ?? undefined;
+
+    return {
+      ...normalizeWorkflowContext(value),
+      script_id: scriptId,
+      override_storage_path: overrideStoragePath,
+    };
+  });
 
 const PublisherPublishSnakeSchema = WorkflowContextSchema.extend({
   experiment_id: z.string().uuid("experiment_id must be a valid UUID"),
@@ -86,11 +102,15 @@ const PublisherPublishCamelSchema = WorkflowContextCamelSchema.extend({
 
 export const PublisherPublishRequestSchema = z
   .union([PublisherPublishSnakeSchema, PublisherPublishCamelSchema])
-  .transform((value) => ({
-    ...normalizeWorkflowContext(value),
-    experiment_id: "experiment_id" in value ? value.experiment_id : value.experimentId,
-    platform: value.platform,
-  }));
+  .transform((value) => {
+    const experimentId =
+      "experiment_id" in value ? value.experiment_id : value.experimentId;
+    return {
+      ...normalizeWorkflowContext(value),
+      experiment_id: experimentId,
+      platform: value.platform,
+    };
+  });
 
 export const WorkflowIdSchema = z.enum([
   "content-cycle",

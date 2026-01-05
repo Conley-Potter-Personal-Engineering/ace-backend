@@ -1,5 +1,5 @@
 import { z } from "zod";
- 
+
 
 export const ScriptwriterAgentInputSchema = z.object({
   productId: z.string().uuid("productId must be a valid UUID"),
@@ -65,6 +65,12 @@ export const StyleTemplateSchema = z.object({
     body: z.string().trim().min(1, "Body font is required"),
   }),
   transitions: z.array(z.string().trim().min(1)).optional(),
+  branding: z
+    .object({
+      logoUrl: z.string().trim().url().optional(),
+      watermarkText: z.string().trim().min(1).optional(),
+    })
+    .optional(),
   metadata: z.record(z.unknown()).optional(),
   isActive: z.boolean().default(true),
 });
