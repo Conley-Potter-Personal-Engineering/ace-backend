@@ -3,6 +3,8 @@ import type BaseAgent from "../../agents/BaseAgent";
 import {
   EditorAgent,
   type EditorAgentResult,
+  EditorAgentError,
+  type EditorAgentErrorCode,
 } from "../../agents/EditorAgent";
 import {
   PublisherAgent,
@@ -21,6 +23,7 @@ import * as trendSnapshotsRepo from "../../repos/trendSnapshots";
 import { fetchRecentSystemEvents, logSystemEvent } from "../../repos/systemEvents";
 import {
   EditorAgentInputSchema,
+  EditorRequestSchema,
   PublishRequestSchema,
   ScriptwriterAgentInputSchema,
   type PublishRequest,
@@ -359,100 +362,90 @@ export const generateScriptFromApi = async (rawBody: unknown) => {
   }
 };
 
+const EditorAPIRequestSchema = EditorRequestSchema.extend({
+  workflow_id: z.string().uuid().optional(),
+  correlation_id: z.string().uuid().optional(),
+});
+
 export const renderAssetFromApi = async (rawBody: unknown) => {
-  const parsedBody = EditorRenderRequestSchema.parse(rawBody ?? {});
-  const context: WorkflowContext = {
-    workflow_id: parsedBody.workflow_id,
-    correlation_id: parsedBody.correlation_id,
-  };
-
-  const script = await getScriptOrThrow(parsedBody.script_id, context);
-  if (!script.product_id) {
-    throw new AgentApiError(
-      `Script ${parsedBody.script_id} is not linked to a product`,
-      400,
-      attachContext({ script_id: parsedBody.script_id }, context),
-    );
-  }
-
-  await getProductOrThrow(script.product_id, context);
-
-  await logLifecycleEvent(
-    "EditorAgent",
-    "video.render.start",
-    {
-      script_id: parsedBody.script_id,
-      product_id: script.product_id,
-    },
-    context,
-  );
-
   try {
-    const agentInput = {
-      scriptId: parsedBody.script_id,
-      composition: defaultEditorComposition,
-      renderBackend: "supabase",
+    const parsedBody = EditorAPIRequestSchema.parse(rawBody ?? {});
+    const context: WorkflowContext = {
+      workflow_id: parsedBody.workflow_id,
+      correlation_id: parsedBody.correlation_id,
     };
 
-    const result = (await new EditorAgent().execute(agentInput)) as EditorAgentResult;
-    const asset = result.persistedAsset;
+    // Note: Validation of script/template existence is handled by EditorAgent v2.
+    // The handler delegates all business logic to the agent.
 
-    if (!asset) {
-      throw new AgentApiError(
-        "EditorAgent returned no persisted asset",
-        500,
-        attachContext({ script_id: parsedBody.script_id }, context),
-      );
-    }
+    // Pass the full input including workflow context to the agent
+    // EditorAgent v2 uses EditorRequestSchema internally to parse specific fields
+    const agentInput = {
+      ...parsedBody,
+      // Ensure strictly typed fields required by EditorRequestSchema are present
+      scriptId: parsedBody.scriptId,
+      composition: parsedBody.composition,
+      styleTemplateId: parsedBody.styleTemplateId,
+      renderBackend: parsedBody.renderBackend,
+    };
 
-    await logLifecycleEvent(
-      "EditorAgent",
-      "video.render.success",
-      {
-        asset_id: asset.asset_id,
-        script_id: asset.script_id ?? parsedBody.script_id,
-        product_id: script.product_id,
-      },
-      context,
-    );
+    // Execute agent - this will emit agent.start, video.render.* events
+    const result = (await new EditorAgent().execute(
+      agentInput,
+    )) as EditorAgentResult;
+
+    const { persistedAsset, storageUrl, asset } = result;
 
     return {
+      asset_id: persistedAsset.asset_id,
+      script_id: persistedAsset.script_id,
+      storage_url: storageUrl,
+      duration: persistedAsset.duration_seconds,
+      tone: asset.tone,
+      layout: asset.layout,
+      style_tags: asset.styleTags,
+      metadata: result.metadata ?? {},
+      created_at: persistedAsset.created_at ?? nowIso(),
       workflow_id: parsedBody.workflow_id ?? null,
       correlation_id: parsedBody.correlation_id ?? null,
-      asset_id: asset.asset_id,
-      script_id: asset.script_id ?? parsedBody.script_id,
-      storage_path: asset.storage_path,
-      duration_seconds: asset.duration_seconds ?? null,
-      thumbnail_path: asset.thumbnail_path ?? null,
-      metadata: result.metadata ?? {},
-      created_at: asset.created_at ?? nowIso(),
     };
   } catch (error) {
-    await logLifecycleEvent(
-      "EditorAgent",
-      "video.render.error",
-      {
-        script_id: parsedBody.script_id,
-        product_id: script.product_id,
-        message: error instanceof Error ? error.message : String(error),
-      },
-      context,
-    );
+    if (error instanceof z.ZodError) {
+      throw new AgentApiError("Invalid request data", 400, error.errors);
+    }
 
     if (error instanceof AgentApiError) {
       throw error;
     }
 
+    // Map EditorAgent errors to API errors
+    /* 
+       We need to check if the error is an EditorAgentError.
+       Since we can't easily instanceof check a class from another module if strictly importing types unless we import the class value,
+       we should ensure EditorAgent is imported as a value. 
+       (It is imported as { EditorAgent, ... } already).
+    */
+    if (
+      // Check if it looks like an EditorAgentError (has code property) or instanceof
+      // Using duck typing or explicit check if available
+      (error as any).name === "EditorAgentError" ||
+      (error as any).code
+    ) {
+      const code = (error as any).code; // EditorAgentErrorCode
+      const message = (error as Error).message;
+
+      switch (code) {
+        case "VALIDATION":
+        case "NOT_FOUND":
+          throw new AgentApiError(message, 400, { code });
+        default:
+          throw new AgentApiError(message, 500, { code });
+      }
+    }
+
     throw new AgentApiError(
-      "Failed to render asset",
+      error instanceof Error ? error.message : "Internal Server Error",
       500,
-      attachContext(
-        {
-          script_id: parsedBody.script_id,
-          product_id: script.product_id,
-        },
-        context,
-      ),
     );
   }
 };
@@ -479,7 +472,7 @@ export const publishExperimentPostFromApi = async (rawBody: unknown) => {
       assetId: experiment.asset_id ?? undefined,
       scriptId: experiment.script_id ?? undefined,
       productId: experiment.product_id ?? undefined,
-      platforms: [{ platform: parsedBody.platform }],
+      platforms: [{ platform: parsedBody.platform, tags: [] }],
     };
 
     const result = (await new PublisherAgent().execute(agentInput)) as PublisherAgentResult;
