@@ -90,12 +90,12 @@ Triggers the Editor Agent to render a video asset from a script.
   {
     "scriptId": "uuid",
     "styleTemplateId": "uuid", // Optional
-    "composition": {           // Optional
+    "composition": {
       "duration": number,
-      "tone": "balanced",
-      "layout": "vertical"
+      "tone": "balanced" | "dramatic" | "minimal",
+      "layout": "vertical" | "horizontal" | "square"
     },
-    "renderBackend": "mock" | "real", // Optional
+    "renderBackend": "local" | "s3" | "supabase", // Optional (default: supabase)
     "workflow_id": "uuid",            // Optional
     "correlation_id": "uuid"          // Optional
   }
@@ -111,7 +111,7 @@ Triggers the Editor Agent to render a video asset from a script.
       "duration": number,
       "tone": "...",
       "layout": "...",
-      "style_tags": [...],
+      "style_tags": ["..."],
       "metadata": { ... },
       "created_at": "ISO8601",
       "workflow_id": "...",
