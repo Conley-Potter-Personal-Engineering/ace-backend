@@ -1,5 +1,5 @@
 import { z } from "zod";
- 
+
 
 export const ScriptwriterAgentInputSchema = z.object({
   productId: z.string().uuid("productId must be a valid UUID"),
@@ -50,6 +50,32 @@ export const EditorChainOutputSchema = z.object({
 });
 
 export type EditorChainOutput = z.infer<typeof EditorChainOutputSchema>;
+
+export const StyleTemplateSchema = z.object({
+  id: z.string().uuid("id must be a valid UUID").optional(),
+  name: z.string().trim().min(1, "Template name is required"),
+  description: z.string().trim().optional(),
+  colors: z.object({
+    primary: z.string().trim().min(1, "Primary color is required"),
+    secondary: z.string().trim().min(1, "Secondary color is required"),
+    background: z.string().trim().min(1, "Background color is required"),
+  }),
+  fonts: z.object({
+    title: z.string().trim().min(1, "Title font is required"),
+    body: z.string().trim().min(1, "Body font is required"),
+  }),
+  transitions: z.array(z.string().trim().min(1)).optional(),
+  branding: z
+    .object({
+      logoUrl: z.string().trim().url().optional(),
+      watermarkText: z.string().trim().min(1).optional(),
+    })
+    .optional(),
+  metadata: z.record(z.unknown()).optional(),
+  isActive: z.boolean().default(true),
+});
+
+export type StyleTemplate = z.infer<typeof StyleTemplateSchema>;
 
 export const EditorRequestSchema = z.object({
   scriptId: z.string().uuid("scriptId must be a valid UUID"),

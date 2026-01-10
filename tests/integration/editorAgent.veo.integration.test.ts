@@ -252,14 +252,19 @@ describe("EditorAgent VEO integration", () => {
     const result = await agent.run(input);
 
     const expectedPrompt =
-      "Generate a 12-second uplifting video in montage style about: Demo summary.";
+      "Generate a 12-second uplifting video in montage layout about: Demo summary.";
 
     expect(generateVideoWithVeo).toHaveBeenCalledTimes(1);
     expect(generateVideoWithVeo).toHaveBeenCalledWith(expectedPrompt, {
       duration: 12,
     });
     expect(storageUploader).toHaveBeenCalledTimes(1);
-    expect(storageUploader).toHaveBeenCalledWith(expect.any(Buffer), "supabase");
+    expect(storageUploader).toHaveBeenCalledWith(
+      expect.any(Buffer),
+      "supabase",
+      "videos/rendered/mock.mp4",
+      "video/mp4",
+    );
 
     const persistedAssets = await videoAssetsRepo.listAssetsForScript(scriptId);
     expect(persistedAssets).toHaveLength(1);
@@ -277,9 +282,13 @@ describe("EditorAgent VEO integration", () => {
     assertEventOrder(eventTypes, [
       "agent.start",
       "video.render.start",
-      "video.render.success",
+      "video.render.progress",
       "video.generate.start",
       "video.generate.success",
+      "video.render.progress",
+      "video.assets.uploaded",
+      "video.render.success",
+      "video.assets.created",
       "agent.success",
     ]);
   });
@@ -334,6 +343,7 @@ describe("EditorAgent VEO integration", () => {
 
     const eventTypes = getEventTypesForAgent(agentName);
     expect(eventTypes).toContain("video.generate.error");
+    expect(eventTypes).toContain("video.render.error");
     expect(eventTypes).toContain("agent.error");
     expect(eventTypes).not.toContain("video.generate.success");
     expect(eventTypes).not.toContain("agent.success");
@@ -355,6 +365,7 @@ describe("EditorAgent VEO integration", () => {
     expect(editorChain).not.toHaveBeenCalled();
 
     const eventTypes = getEventTypesForAgent(agentName);
+    expect(eventTypes).toContain("video.render.error");
     expect(eventTypes).toContain("agent.error");
     expect(eventTypes).not.toContain("video.generate.start");
     expect(eventTypes).not.toContain("video.generate.success");
