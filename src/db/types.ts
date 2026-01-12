@@ -329,6 +329,7 @@ export type Database = {
       published_posts: {
         Row: {
           caption: string | null
+          correlation_id: string | null
           created_at: string | null
           experiment_id: string | null
           hashtags: string[] | null
@@ -336,9 +337,11 @@ export type Database = {
           platform_post_id: string | null
           post_id: string
           posted_at: string | null
+          workflow_id: string | null
         }
         Insert: {
           caption?: string | null
+          correlation_id?: string | null
           created_at?: string | null
           experiment_id?: string | null
           hashtags?: string[] | null
@@ -346,9 +349,11 @@ export type Database = {
           platform_post_id?: string | null
           post_id?: string
           posted_at?: string | null
+          workflow_id?: string | null
         }
         Update: {
           caption?: string | null
+          correlation_id?: string | null
           created_at?: string | null
           experiment_id?: string | null
           hashtags?: string[] | null
@@ -356,6 +361,7 @@ export type Database = {
           platform_post_id?: string | null
           post_id?: string
           posted_at?: string | null
+          workflow_id?: string | null
         }
         Relationships: [
           {
@@ -414,33 +420,42 @@ export type Database = {
       }
       scripts: {
         Row: {
+          cta: string | null
           created_at: string | null
           creative_pattern_id: string | null
           creative_variables: Json | null
           hook: string | null
+          outline: string | null
           product_id: string | null
           script_id: string
           script_text: string
+          title: string | null
           trend_reference: string | null
         }
         Insert: {
+          cta?: string | null
           created_at?: string | null
           creative_pattern_id?: string | null
           creative_variables?: Json | null
           hook?: string | null
+          outline?: string | null
           product_id?: string | null
           script_id?: string
           script_text: string
+          title?: string | null
           trend_reference?: string | null
         }
         Update: {
+          cta?: string | null
           created_at?: string | null
           creative_pattern_id?: string | null
           creative_variables?: Json | null
           hook?: string | null
+          outline?: string | null
           product_id?: string | null
           script_id?: string
           script_text?: string
+          title?: string | null
           trend_reference?: string | null
         }
         Relationships: [
@@ -582,25 +597,37 @@ export type Database = {
           asset_id: string
           created_at: string | null
           duration_seconds: number | null
+          layout: string | null
+          metadata: Json | null
           script_id: string | null
           storage_path: string
+          style_tags: string[] | null
           thumbnail_path: string | null
+          tone: string | null
         }
         Insert: {
           asset_id?: string
           created_at?: string | null
           duration_seconds?: number | null
+          layout?: string | null
+          metadata?: Json | null
           script_id?: string | null
           storage_path: string
+          style_tags?: string[] | null
           thumbnail_path?: string | null
+          tone?: string | null
         }
         Update: {
           asset_id?: string
           created_at?: string | null
           duration_seconds?: number | null
+          layout?: string | null
+          metadata?: Json | null
           script_id?: string | null
           storage_path?: string
+          style_tags?: string[] | null
           thumbnail_path?: string | null
+          tone?: string | null
         }
         Relationships: [
           {

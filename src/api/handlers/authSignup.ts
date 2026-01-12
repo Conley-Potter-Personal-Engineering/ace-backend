@@ -5,6 +5,7 @@ import { getSupabase } from "@/db/supabase";
 import type { Json } from "@/db/types";
 import { logSystemEvent } from "@/repos/systemEvents";
 import { SignupRequestSchema, type SignupRequest } from "@/schemas/apiSchemas";
+import { respondWithError } from "@/lib/api/middleware/errorHandler";
 
 type SignupResponse =
   | {
@@ -14,7 +15,10 @@ type SignupResponse =
         message: string;
       };
     }
-  | { success: false; error: string };
+  | {
+      success: false;
+      error: { code: string; message: string; details?: unknown };
+    };
 
 const logAuthEvent = async (
   eventType: string,
@@ -44,7 +48,10 @@ export const authSignupHandler = async (
       err instanceof Error ? err.message : "Invalid signup payload";
     await logAuthEvent("auth.signup.error", { message });
     console.error("[auth] Signup validation failed", err);
-    return res.status(400).json({ success: false, error: message });
+    return respondWithError(res, {
+      code: "VALIDATION_ERROR",
+      message,
+    });
   }
 
   let supabase: ReturnType<typeof getSupabase>;
@@ -69,7 +76,10 @@ export const authSignupHandler = async (
         message,
       });
       console.error("[auth] Sign-up failed", error);
-      return res.status(400).json({ success: false, error: message });
+      return respondWithError(res, {
+        code: "INTERNAL_ERROR",
+        message,
+      });
     }
 
     const userEmail = data.user.email ?? credentials.email;
@@ -93,7 +103,10 @@ export const authSignupHandler = async (
       message,
     });
     console.error("[auth] Unexpected sign-up error", err);
-    return res.status(500).json({ success: false, error: message });
+    return respondWithError(res, {
+      code: "INTERNAL_ERROR",
+      message,
+    });
   }
 };
 

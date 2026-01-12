@@ -7,8 +7,9 @@ import {
   type ApiResponseLike,
 } from "../../api/http";
 import { listSystemEventsApi } from "../../api/handlers/systemEventsHandler";
+import { withAuth } from "@/lib/api/middleware/auth";
 
-export default async function handler(
+async function handler(
   req: ApiRequest,
   res: ApiResponseLike,
 ) {
@@ -24,3 +25,5 @@ export default async function handler(
     return handleApiError(res, error, "list system events");
   }
 }
+
+export default withAuth(handler);

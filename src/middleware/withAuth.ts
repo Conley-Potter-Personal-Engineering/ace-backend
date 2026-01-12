@@ -15,7 +15,13 @@ interface WithAuthOptions {
   allowDevBypass?: boolean;
 }
 
-const unauthorizedBody = { success: false as const, error: "Unauthorized" };
+const unauthorizedBody = {
+  success: false as const,
+  error: {
+    code: "UNAUTHORIZED",
+    message: "Authentication required",
+  },
+};
 const isDevelopment = process.env.NODE_ENV === "development";
 
 /**

@@ -36,7 +36,10 @@ export const methodNotAllowed = (
 ) =>
   respond(res, 405, {
     success: false,
-    error: `Method not allowed. Expected: ${allowed.join(", ")}`,
+    error: {
+      code: "VALIDATION_ERROR",
+      message: `Method not allowed. Expected: ${allowed.join(", ")}`,
+    },
   });
 
 export const badRequest = (
@@ -46,8 +49,11 @@ export const badRequest = (
 ) =>
   respond(res, 400, {
     success: false,
-    error: message,
-    details,
+    error: {
+      code: "VALIDATION_ERROR",
+      message,
+      details,
+    },
   });
 
 export const serverError = (
@@ -57,8 +63,11 @@ export const serverError = (
 ) =>
   respond(res, 500, {
     success: false,
-    error: message,
-    details,
+    error: {
+      code: "INTERNAL_ERROR",
+      message,
+      details,
+    },
   });
 
 export const notFound = (
@@ -67,7 +76,38 @@ export const notFound = (
 ) =>
   respond(res, 404, {
     success: false,
-    error: message,
+    error: {
+      code: "NOT_FOUND",
+      message,
+    },
+  });
+
+export const unauthorized = (
+  res: ApiResponseLike | undefined,
+  message: string,
+  details?: unknown,
+) =>
+  respond(res, 401, {
+    success: false,
+    error: {
+      code: "UNAUTHORIZED",
+      message,
+      details,
+    },
+  });
+
+export const forbidden = (
+  res: ApiResponseLike | undefined,
+  message: string,
+  details?: unknown,
+) =>
+  respond(res, 403, {
+    success: false,
+    error: {
+      code: "FORBIDDEN",
+      message,
+      details,
+    },
   });
 
 export const ok = <T>(res: ApiResponseLike | undefined, body: T) =>

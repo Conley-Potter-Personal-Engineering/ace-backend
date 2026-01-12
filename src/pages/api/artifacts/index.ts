@@ -7,8 +7,9 @@ import {
   type ApiResponseLike,
 } from "../../../api/http";
 import { listArtifacts } from "../../../api/handlers/artifactsHandler";
+import { withAuth } from "@/lib/api/middleware/auth";
 
-export default async function handler(
+async function handler(
   req: ApiRequest,
   res: ApiResponseLike,
 ) {
@@ -24,3 +25,5 @@ export default async function handler(
     return handleApiError(res, error, "list artifacts");
   }
 }
+
+export default withAuth(handler);

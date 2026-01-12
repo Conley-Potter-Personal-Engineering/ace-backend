@@ -5,13 +5,17 @@ import { getSupabase } from "@/db/supabase";
 import type { Json } from "@/db/types";
 import { logSystemEvent } from "@/repos/systemEvents";
 import { LoginRequestSchema, type LoginRequest } from "@/schemas/apiSchemas";
+import { respondWithError } from "@/lib/api/middleware/errorHandler";
 
 type LoginResponse =
   | {
       success: true;
       data: { token: string; user: User };
     }
-  | { success: false; error: string };
+  | {
+      success: false;
+      error: { code: string; message: string; details?: unknown };
+    };
 
 const logAuthEvent = async (
   eventType: string,
@@ -41,7 +45,10 @@ export const authLoginHandler = async (
       err instanceof Error ? err.message : "Invalid login payload";
     await logAuthEvent("auth.login.error", { message });
     console.error("Auth login validation failed", err);
-    return res.status(400).json({ success: false, error: message });
+    return respondWithError(res, {
+      code: "VALIDATION_ERROR",
+      message,
+    });
   }
 
   await logAuthEvent("auth.login.start", { email: credentials.email });
@@ -66,7 +73,10 @@ export const authLoginHandler = async (
         message,
       });
       console.error("Auth login failed", error);
-      return res.status(400).json({ success: false, error: message });
+      return respondWithError(res, {
+        code: "UNAUTHORIZED",
+        message,
+      });
     }
 
     const token = data.session.access_token;
@@ -86,7 +96,10 @@ export const authLoginHandler = async (
       message,
     });
     console.error("Auth login unexpected error", err);
-    return res.status(500).json({ success: false, error: message });
+    return respondWithError(res, {
+      code: "INTERNAL_ERROR",
+      message,
+    });
   }
 };
 

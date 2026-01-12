@@ -141,6 +141,51 @@ export const SystemEventsQuerySchema = z.object({
   limit: z.coerce.number().int().positive().max(200).optional(),
 });
 
+const BooleanQuerySchema = z
+  .union([z.literal("true"), z.literal("false"), z.boolean()])
+  .transform((value) => value === true || value === "true");
+
+const DateTimeQuerySchema = z.string().datetime();
+
+const PaginationQuerySchema = z.object({
+  limit: z.coerce.number().int().min(1).max(100).optional(),
+  offset: z.coerce.number().int().min(0).optional(),
+});
+
+export const ExperimentsListQuerySchema = PaginationQuerySchema.extend({
+  product_id: z.string().uuid("product_id must be a valid UUID").optional(),
+  start_date: DateTimeQuerySchema.optional(),
+  end_date: DateTimeQuerySchema.optional(),
+  has_performance: BooleanQuerySchema.optional(),
+  min_score: z.coerce.number().optional(),
+  max_score: z.coerce.number().optional(),
+  sort: z
+    .enum([
+      "created_at_desc",
+      "created_at_asc",
+      "score_desc",
+      "score_asc",
+    ])
+    .optional(),
+});
+
+export const ExperimentIdParamSchema = z.string().uuid("id must be a valid UUID");
+
+export const ScriptsListQuerySchema = PaginationQuerySchema.extend({
+  product_id: z.string().uuid("product_id must be a valid UUID").optional(),
+  start_date: DateTimeQuerySchema.optional(),
+  end_date: DateTimeQuerySchema.optional(),
+  has_experiments: BooleanQuerySchema.optional(),
+  sort: z.enum(["created_at_desc", "created_at_asc", "title_asc"]).optional(),
+});
+
+export const VideosListQuerySchema = ScriptsListQuerySchema;
+
+export const PostsListQuerySchema = ScriptsListQuerySchema.extend({
+  platform: z.enum(["instagram", "tiktok", "youtube"]).optional(),
+  experiment_id: z.string().uuid("experiment_id must be a valid UUID").optional(),
+});
+
 export const LoginRequestSchema = z.object({
   email: z.string().email("email must be valid"),
   password: z.string().min(6, "password is required"),

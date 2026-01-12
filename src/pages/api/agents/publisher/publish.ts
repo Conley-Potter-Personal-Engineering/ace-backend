@@ -1,9 +1,7 @@
 import { handleApiError } from "../../../../api/error";
 import {
-  badRequest,
   methodNotAllowed,
   ok,
-  serverError,
   type ApiRequest,
   type ApiResponseLike,
 } from "../../../../api/http";
@@ -11,8 +9,10 @@ import {
   AgentApiError,
   publishExperimentPostFromApi,
 } from "../../../../api/handlers/agentsHandler";
+import { withAuth } from "@/lib/api/middleware/auth";
+import { respondWithError } from "@/lib/api/middleware/errorHandler";
 
-export default async function handler(
+async function handler(
   req: ApiRequest,
   res: ApiResponseLike,
 ) {
@@ -25,10 +25,21 @@ export default async function handler(
     return ok(res, { success: true, data });
   } catch (error) {
     if (error instanceof AgentApiError) {
-      return error.status === 400
-        ? badRequest(res, error.message, error.details)
-        : serverError(res, error.message, error.details);
+      if (error.status === 400) {
+        return respondWithError(res, {
+          code: "VALIDATION_ERROR",
+          message: error.message,
+          details: error.details,
+        });
+      }
+      return respondWithError(res, {
+        code: "AGENT_ERROR",
+        message: error.message,
+        details: error.details,
+      });
     }
     return handleApiError(res, error, "publish experiment post");
   }
 }
+
+export default withAuth(handler);

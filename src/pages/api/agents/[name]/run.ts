@@ -7,6 +7,8 @@ import {
   type ApiResponseLike,
 } from "../../../../api/http";
 import { triggerAgentRun } from "../../../../api/handlers/agentsHandler";
+import { withAuth } from "@/lib/api/middleware/auth";
+import { respondWithError } from "@/lib/api/middleware/errorHandler";
 
 const extractNameParam = (req: ApiRequest) => {
   const value = req.query?.name;
@@ -16,7 +18,7 @@ const extractNameParam = (req: ApiRequest) => {
   return Array.isArray(value) ? value[0] : value;
 };
 
-export default async function handler(
+async function handler(
   req: ApiRequest,
   res: ApiResponseLike,
 ) {
@@ -37,6 +39,14 @@ export default async function handler(
       data: result.result,
     });
   } catch (error) {
+    if (error instanceof Error && error.name === "AgentApiError") {
+      return respondWithError(res, {
+        code: "AGENT_ERROR",
+        message: error.message,
+      });
+    }
     return handleApiError(res, error, "run agent");
   }
 }
+
+export default withAuth(handler);

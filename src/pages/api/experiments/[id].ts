@@ -1,4 +1,4 @@
-import { handleApiError } from "../../../api/error";
+import { handleApiError } from "@/api/error";
 import {
   badRequest,
   methodNotAllowed,
@@ -6,8 +6,8 @@ import {
   ok,
   type ApiRequest,
   type ApiResponseLike,
-} from "../../../api/http";
-import { fetchArtifactDetail } from "../../../api/handlers/artifactsHandler";
+} from "@/api/http";
+import { getExperimentDetailApi } from "@/api/handlers/experimentsHandler";
 import { withAuth } from "@/lib/api/middleware/auth";
 
 const extractIdParam = (req: ApiRequest) => {
@@ -18,27 +18,24 @@ const extractIdParam = (req: ApiRequest) => {
   return Array.isArray(value) ? value[0] : value;
 };
 
-async function handler(
-  req: ApiRequest,
-  res: ApiResponseLike,
-) {
+async function handler(req: ApiRequest, res: ApiResponseLike) {
   if (req.method !== "GET") {
     return methodNotAllowed(res, ["GET"]);
   }
 
-  const artifactId = extractIdParam(req);
-  if (!artifactId) {
-    return badRequest(res, "Artifact id is required");
+  const experimentId = extractIdParam(req);
+  if (!experimentId) {
+    return badRequest(res, "Experiment id is required");
   }
 
   try {
-    const data = await fetchArtifactDetail(artifactId);
+    const data = await getExperimentDetailApi(experimentId);
     if (!data) {
-      return notFound(res, "Artifact not found");
+      return notFound(res, "Experiment not found");
     }
     return ok(res, { success: true, data });
   } catch (error) {
-    return handleApiError(res, error, "fetch artifact");
+    return handleApiError(res, error, "fetch experiment");
   }
 }
 
