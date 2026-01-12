@@ -150,7 +150,7 @@ export const findMany = async (filters: ScriptFilters) => {
     query = query.lte("created_at", filters.endDate);
   }
 
-  const { data, error } = await query.returns<Tables<\"scripts\">[]>();
+  const { data, error } = await query.returns<Tables<"scripts">[]>();
 
   if (error) {
     throw new Error(`Failed to list scripts: ${error.message}`);
