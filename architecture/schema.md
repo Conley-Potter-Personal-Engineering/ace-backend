@@ -269,7 +269,13 @@ Logs every meaningful action inside ACE. Provides the backbone for observability
 • event_id: uuid primary key  
 • agent_name: string  
 • event_type: string  
+• event_category: string  
+• severity: string  
+• message: string  
 • payload: jsonb  
+• metadata: jsonb  
+• correlation_id: string  
+• workflow_id: string  
 • created_at: timestamp  
 
 ### Used By
