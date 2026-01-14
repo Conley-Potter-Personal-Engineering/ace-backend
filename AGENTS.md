@@ -811,8 +811,8 @@ Use the Notion MCP to search and retrieve architecture documents from **The Synt
 
 Example queries:
 
-- "Show me the ScriptwriterAgent specification"
-- "What are the Phase 1 roadmap tasks for the backend?"
+- "Show me the EditorAgent specification"
+- "Show me the engineering documents related to the Coding Prompt: '...'?"
 - "Find the latest Scriptwriter Agent upgrade plan"
 
 **For other coding agents:**
