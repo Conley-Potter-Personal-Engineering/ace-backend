@@ -66,6 +66,8 @@ export const getExperimentById = async (experimentId: string) => {
   return data;
 };
 
+export const findById = getExperimentById;
+
 export const updateExperiment = async (
   experimentId: string,
   changes: TablesUpdate<"experiments">,
@@ -108,6 +110,50 @@ export const deleteExperiment = async (experimentId: string) => {
   return data;
 };
 
+export interface ExperimentFilters {
+  productId?: string;
+  startDate?: string;
+  endDate?: string;
+}
+
+export interface ExperimentWithRelations extends Tables<"experiments"> {
+  products?: { name: string | null } | null;
+  scripts?: { title: string | null } | null;
+}
+
+/**
+ * Finds experiments with optional filters and lightweight relations.
+ */
+export const findMany = async (
+  filters: ExperimentFilters,
+): Promise<ExperimentWithRelations[]> => {
+  let query = getSupabase()
+    .from("experiments")
+    .select("experiment_id, product_id, script_id, asset_id, created_at, products(name), scripts(title)")
+    .order("created_at", { ascending: false });
+
+  if (filters.productId) {
+    const validatedProductId = identifierSchema.parse(filters.productId);
+    query = query.eq("product_id", validatedProductId);
+  }
+
+  if (filters.startDate) {
+    query = query.gte("created_at", filters.startDate);
+  }
+
+  if (filters.endDate) {
+    query = query.lte("created_at", filters.endDate);
+  }
+
+  const { data, error } = await query.returns<ExperimentWithRelations[]>();
+
+  if (error) {
+    throw new Error(`Failed to list experiments: ${error.message}`);
+  }
+
+  return data ?? [];
+};
+
 export const listExperimentsForProduct = async (productId: string) => {
   const validatedProductId = identifierSchema.parse(productId);
   const { data, error } = await getSupabase()
@@ -143,6 +189,27 @@ export const listExperimentsForScript = async (scriptId: string) => {
   return data ?? [];
 };
 
+/**
+ * Lists experiments for a set of script ids.
+ */
+export const listExperimentsForScriptIds = async (scriptIds: string[]) => {
+  if (!scriptIds.length) {
+    return [];
+  }
+
+  const { data, error } = await getSupabase()
+    .from("experiments")
+    .select("*")
+    .in("script_id", scriptIds)
+    .returns<Tables<"experiments">[]>();
+
+  if (error) {
+    throw new Error(`Failed to list experiments for scripts: ${error.message}`);
+  }
+
+  return data ?? [];
+};
+
 export const listExperimentsForAsset = async (assetId: string) => {
   const validatedAssetId = identifierSchema.parse(assetId);
   const { data, error } = await getSupabase()
@@ -155,6 +222,27 @@ export const listExperimentsForAsset = async (assetId: string) => {
     throw new Error(
       `Failed to list experiments for asset ${validatedAssetId}: ${error.message}`,
     );
+  }
+
+  return data ?? [];
+};
+
+/**
+ * Lists experiments for a set of asset ids.
+ */
+export const listExperimentsForAssetIds = async (assetIds: string[]) => {
+  if (!assetIds.length) {
+    return [];
+  }
+
+  const { data, error } = await getSupabase()
+    .from("experiments")
+    .select("*")
+    .in("asset_id", assetIds)
+    .returns<Tables<"experiments">[]>();
+
+  if (error) {
+    throw new Error(`Failed to list experiments for assets: ${error.message}`);
   }
 
   return data ?? [];

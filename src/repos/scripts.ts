@@ -10,8 +10,11 @@ const mapToDbPayload = (
 ): TablesInsert<"scripts"> => ({
   script_id: payload.scriptId,
   product_id: payload.productId,
+  title: payload.title ?? null,
   script_text: payload.scriptText,
   hook: payload.hook,
+  cta: payload.cta ?? null,
+  outline: payload.outline ?? null,
   creative_variables: payload.creativeVariables,
   creative_pattern_id: payload.creativePatternId,
   trend_reference: payload.trendReference ?? null,
@@ -115,6 +118,42 @@ export const listScriptsForProduct = async (productId: string) => {
     throw new Error(
       `Failed to list scripts for product ${productId}: ${error.message}`,
     );
+  }
+
+  return data ?? [];
+};
+
+export interface ScriptFilters {
+  productId?: string;
+  startDate?: string;
+  endDate?: string;
+}
+
+/**
+ * Finds scripts with optional filters.
+ */
+export const findMany = async (filters: ScriptFilters) => {
+  let query = getSupabase()
+    .from("scripts")
+    .select("*")
+    .order("created_at", { ascending: false });
+
+  if (filters.productId) {
+    query = query.eq("product_id", filters.productId);
+  }
+
+  if (filters.startDate) {
+    query = query.gte("created_at", filters.startDate);
+  }
+
+  if (filters.endDate) {
+    query = query.lte("created_at", filters.endDate);
+  }
+
+  const { data, error } = await query.returns<Tables<"scripts">[]>();
+
+  if (error) {
+    throw new Error(`Failed to list scripts: ${error.message}`);
   }
 
   return data ?? [];

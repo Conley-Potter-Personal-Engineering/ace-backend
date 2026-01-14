@@ -3,8 +3,6 @@ import type BaseAgent from "../../agents/BaseAgent";
 import {
   EditorAgent,
   type EditorAgentResult,
-  EditorAgentError,
-  type EditorAgentErrorCode,
 } from "../../agents/EditorAgent";
 import {
   PublisherAgent,
@@ -18,7 +16,6 @@ import * as creativePatternsRepo from "../../repos/creativePatterns";
 import * as experimentsRepo from "../../repos/experiments";
 import * as productsRepo from "../../repos/products";
 import * as publishedPostsRepo from "../../repos/publishedPosts";
-import * as scriptsRepo from "../../repos/scripts";
 import * as trendSnapshotsRepo from "../../repos/trendSnapshots";
 import { fetchRecentSystemEvents, logSystemEvent } from "../../repos/systemEvents";
 import {
@@ -31,7 +28,6 @@ import {
 import {
   AgentNameSchema,
   AgentRunRequestSchema,
-  EditorRenderRequestSchema,
   PublisherPublishRequestSchema,
   ScriptwriterGenerateRequestSchema,
   type AgentName,
@@ -231,23 +227,6 @@ const getTrendSnapshotOrThrow = async (
   return trendSnapshot;
 };
 
-const getScriptOrThrow = async (
-  scriptId: string,
-  context: WorkflowContext,
-) => {
-  const script = await scriptsRepo.getScriptById(scriptId);
-
-  if (!script) {
-    throw new AgentApiError(
-      `Script ${scriptId} not found`,
-      400,
-      attachContext({ script_id: scriptId }, context),
-    );
-  }
-
-  return script;
-};
-
 const getExperimentOrThrow = async (
   experimentId: string,
   context: WorkflowContext,
@@ -264,12 +243,6 @@ const getExperimentOrThrow = async (
 
   return experiment;
 };
-
-const defaultEditorComposition = {
-  duration: 45,
-  tone: "balanced",
-  layout: "vertical",
-} as const;
 
 export const generateScriptFromApi = async (rawBody: unknown) => {
   const parsedBody = ScriptwriterGenerateRequestSchema.parse(rawBody ?? {});
@@ -370,10 +343,6 @@ const EditorAPIRequestSchema = EditorRequestSchema.extend({
 export const renderAssetFromApi = async (rawBody: unknown) => {
   try {
     const parsedBody = EditorAPIRequestSchema.parse(rawBody ?? {});
-    const context: WorkflowContext = {
-      workflow_id: parsedBody.workflow_id,
-      correlation_id: parsedBody.correlation_id,
-    };
 
     // Note: Validation of script/template existence is handled by EditorAgent v2.
     // The handler delegates all business logic to the agent.

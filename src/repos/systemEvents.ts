@@ -1,14 +1,36 @@
+import type { SupabaseClient } from "@supabase/supabase-js";
 import { getSupabase } from "../db/db";
-import type { Tables, TablesInsert, TablesUpdate } from "../db/types";
+import type { Database, Tables, TablesInsert, TablesUpdate } from "../db/types";
 import { identifierSchema, jsonSchema, nullableDateSchema, z } from "./validators";
 
+const eventCategorySchema = z.enum([
+  "workflow",
+  "agent",
+  "system",
+  "integration",
+]);
+
+const severitySchema = z.enum([
+  "debug",
+  "info",
+  "warning",
+  "error",
+  "critical",
+]);
+
 const systemEventInsertSchema = z.object({
-    agent_name: z.string().trim().nullable().optional(),
-    created_at: nullableDateSchema,
-    event_id: identifierSchema.optional(),
-    event_type: z.string().min(1, "Event type is required"),
-    payload: jsonSchema.nullable().optional(),
-  });
+  agent_name: z.string().trim().min(1).max(100).nullable().optional(),
+  correlation_id: z.string().trim().min(1).max(100).nullable().optional(),
+  workflow_id: z.string().trim().min(1).max(100).nullable().optional(),
+  event_category: eventCategorySchema.optional(),
+  severity: severitySchema.optional(),
+  message: z.string().trim().min(1).max(500).nullable().optional(),
+  metadata: jsonSchema.nullable().optional(),
+  created_at: nullableDateSchema,
+  event_id: identifierSchema.optional(),
+  event_type: z.string().min(1, "Event type is required").max(100),
+  payload: jsonSchema.nullable().optional(),
+});
 
 const systemEventUpdateSchema = systemEventInsertSchema.partial();
 
@@ -16,9 +38,10 @@ const eventIdSchema = identifierSchema.describe("event_id");
 
 export const logSystemEvent = async (
   payload: TablesInsert<"system_events">,
+  supabase: SupabaseClient<Database> = getSupabase(),
 ) => {
   const validated = systemEventInsertSchema.parse(payload);
-  const { data, error } = await getSupabase()
+  const { data, error } = await supabase
     .from("system_events")
     .insert(validated)
     .select("*")

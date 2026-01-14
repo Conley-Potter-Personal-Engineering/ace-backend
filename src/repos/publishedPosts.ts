@@ -9,6 +9,7 @@ import {
 
 const publishedPostInsertSchema = z.object({
     caption: z.string().trim().nullable().optional(),
+    correlation_id: z.string().trim().nullable().optional(),
     created_at: nullableDateSchema,
     experiment_id: identifierSchema.nullable().optional(),
     hashtags: stringArraySchema.nullable().optional(),
@@ -16,6 +17,7 @@ const publishedPostInsertSchema = z.object({
     platform_post_id: identifierSchema.nullable().optional(),
     post_id: identifierSchema.optional(),
     posted_at: nullableDateSchema,
+    workflow_id: z.string().trim().nullable().optional(),
   });
 
 const publishedPostUpdateSchema = publishedPostInsertSchema.partial();
@@ -46,6 +48,48 @@ export const listPublishedPosts = async () => {
     .select("*")
     .order("posted_at", { ascending: false })
     .returns<Tables<"published_posts">[]>();
+
+  if (error) {
+    throw new Error(`Failed to list published posts: ${error.message}`);
+  }
+
+  return data ?? [];
+};
+
+export interface PublishedPostFilters {
+  experimentId?: string;
+  platform?: string;
+  startDate?: string;
+  endDate?: string;
+}
+
+/**
+ * Finds published posts with optional filters.
+ */
+export const findMany = async (filters: PublishedPostFilters) => {
+  let query = getSupabase()
+    .from("published_posts")
+    .select("*")
+    .order("created_at", { ascending: false });
+
+  if (filters.experimentId) {
+    const validatedExperimentId = identifierSchema.parse(filters.experimentId);
+    query = query.eq("experiment_id", validatedExperimentId);
+  }
+
+  if (filters.platform) {
+    query = query.eq("platform", filters.platform);
+  }
+
+  if (filters.startDate) {
+    query = query.gte("created_at", filters.startDate);
+  }
+
+  if (filters.endDate) {
+    query = query.lte("created_at", filters.endDate);
+  }
+
+  const { data, error } = await query.returns<Tables<"published_posts">[]>();
 
   if (error) {
     throw new Error(`Failed to list published posts: ${error.message}`);
@@ -126,6 +170,29 @@ export const listPostsForExperiment = async (experimentId: string) => {
   if (error) {
     throw new Error(
       `Failed to list posts for experiment ${validatedExperimentId}: ${error.message}`,
+    );
+  }
+
+  return data ?? [];
+};
+
+/**
+ * Lists published posts for a set of experiment ids.
+ */
+export const listPostsForExperimentIds = async (experimentIds: string[]) => {
+  if (!experimentIds.length) {
+    return [];
+  }
+
+  const { data, error } = await getSupabase()
+    .from("published_posts")
+    .select("*")
+    .in("experiment_id", experimentIds)
+    .returns<Tables<"published_posts">[]>();
+
+  if (error) {
+    throw new Error(
+      `Failed to list posts for experiments: ${error.message}`,
     );
   }
 

@@ -8,6 +8,7 @@ import {
   type ApiResponseLike,
 } from "../../../api/http";
 import { fetchArtifactDetail } from "../../../api/handlers/artifactsHandler";
+import { withAuth } from "@/lib/api/middleware/auth";
 
 const extractIdParam = (req: ApiRequest) => {
   const value = req.query?.id;
@@ -17,7 +18,7 @@ const extractIdParam = (req: ApiRequest) => {
   return Array.isArray(value) ? value[0] : value;
 };
 
-export default async function handler(
+async function handler(
   req: ApiRequest,
   res: ApiResponseLike,
 ) {
@@ -40,3 +41,5 @@ export default async function handler(
     return handleApiError(res, error, "fetch artifact");
   }
 }
+
+export default withAuth(handler);

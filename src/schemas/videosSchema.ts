@@ -8,6 +8,10 @@ export const VideoAssetInputSchema = z.object({
   scriptId: z.string().uuid().optional(),
   durationSeconds: PositiveIntSchema.optional(),
   thumbnailPath: z.string().trim().min(1).optional(),
+  tone: z.string().trim().min(1).optional(),
+  layout: z.string().trim().min(1).optional(),
+  styleTags: TagArraySchema.optional(),
+  metadata: z.record(z.unknown()).optional(),
 });
 
 export type VideoAssetInput = z.infer<typeof VideoAssetInputSchema>;

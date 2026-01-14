@@ -3,7 +3,7 @@ import {
   runEditorChain,
   type EditorChainResult,
 } from "../llm/chains/editorChain";
-import { createVideoAsset } from "../repos";
+import { createVideoAsset } from "../repos/videoAssets";
 import { VideoAssetInputSchema } from "../schemas/videosSchema";
 
 export interface RenderedAssetResult {

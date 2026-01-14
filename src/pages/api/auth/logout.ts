@@ -1,16 +1,13 @@
-import type { NextApiRequest, NextApiResponse } from "next";
-
 import { authLogoutHandler } from "@/api/handlers/authLogout";
+import { methodNotAllowed, type ApiRequest, type ApiResponseLike } from "@/api/http";
+import { withAuth } from "@/lib/api/middleware/auth";
 
-export default async function logoutRoute(
-  req: NextApiRequest,
-  res: NextApiResponse,
-) {
+async function logoutRoute(req: ApiRequest, res: ApiResponseLike) {
   if (req.method !== "POST") {
-    return res
-      .status(405)
-      .json({ success: false, error: "Method Not Allowed" });
+    return methodNotAllowed(res, ["POST"]);
   }
 
-  return authLogoutHandler(req, res);
+  return authLogoutHandler(req as any, res as any);
 }
+
+export default withAuth(logoutRoute);

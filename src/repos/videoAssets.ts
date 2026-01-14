@@ -1,15 +1,25 @@
 import { getSupabase } from "../db/db";
 import type { Tables, TablesInsert, TablesUpdate } from "../db/types";
 import { VideoAssetSchema, type VideoAsset } from "../schemas/editorSchemas";
-import { identifierSchema, nullableDateSchema, z } from "./validators";
+import {
+  identifierSchema,
+  jsonSchema,
+  nullableDateSchema,
+  stringArraySchema,
+  z,
+} from "./validators";
 
 const videoAssetInsertSchema = z.object({
   asset_id: identifierSchema.optional(),
   created_at: nullableDateSchema,
   duration_seconds: z.number().nullable().optional(),
+  layout: z.string().trim().nullable().optional(),
+  metadata: jsonSchema.nullable().optional(),
   script_id: identifierSchema.nullable().optional(),
   storage_path: z.string().min(1, "Storage path is required"),
+  style_tags: stringArraySchema.nullable().optional(),
   thumbnail_path: z.string().nullable().optional(),
+  tone: z.string().trim().nullable().optional(),
 });
 
 const videoAssetUpdateSchema = videoAssetInsertSchema.partial();
@@ -31,6 +41,10 @@ export const create = async (
     storage_path: validated.storageUrl,
     duration_seconds: validated.duration,
     thumbnail_path: null,
+    tone: validated.tone ?? null,
+    layout: validated.layout ?? null,
+    style_tags: validated.styleTags ?? [],
+    metadata: null,
     created_at: new Date().toISOString(),
   });
 
@@ -68,6 +82,42 @@ export const listVideoAssets = async () => {
     .select("*")
     .order("created_at", { ascending: false })
     .returns<Tables<"video_assets">[]>();
+
+  if (error) {
+    throw new Error(`Failed to list video assets: ${error.message}`);
+  }
+
+  return data ?? [];
+};
+
+export interface VideoAssetFilters {
+  scriptId?: string;
+  startDate?: string;
+  endDate?: string;
+}
+
+/**
+ * Finds video assets with optional filters.
+ */
+export const findMany = async (filters: VideoAssetFilters) => {
+  let query = getSupabase()
+    .from("video_assets")
+    .select("*")
+    .order("created_at", { ascending: false });
+
+  if (filters.scriptId) {
+    query = query.eq("script_id", filters.scriptId);
+  }
+
+  if (filters.startDate) {
+    query = query.gte("created_at", filters.startDate);
+  }
+
+  if (filters.endDate) {
+    query = query.lte("created_at", filters.endDate);
+  }
+
+  const { data, error } = await query.returns<Tables<"video_assets">[]>();
 
   if (error) {
     throw new Error(`Failed to list video assets: ${error.message}`);

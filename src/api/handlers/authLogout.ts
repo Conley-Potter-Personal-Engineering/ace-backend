@@ -3,10 +3,14 @@ import type { NextApiRequest, NextApiResponse } from "next";
 import { getSupabase } from "@/db/supabase";
 import type { Json } from "@/db/types";
 import { logSystemEvent } from "@/repos/systemEvents";
+import { respondWithError } from "@/lib/api/middleware/errorHandler";
 
 type LogoutResponse =
   | { success: true; data: { message: string } }
-  | { success: false; error: string };
+  | {
+      success: false;
+      error: { code: string; message: string; details?: unknown };
+    };
 
 const logAuthEvent = async (
   eventType: string,
@@ -43,7 +47,10 @@ export const authLogoutHandler = async (
     if (error) {
       await logAuthEvent("auth.logout.error", { message: error.message });
       console.error("Auth logout failed", error);
-      return res.status(400).json({ success: false, error: error.message });
+      return respondWithError(res, {
+        code: "INTERNAL_ERROR",
+        message: error.message,
+      });
     }
 
     await logAuthEvent("auth.logout.success");
@@ -55,7 +62,10 @@ export const authLogoutHandler = async (
       err instanceof Error ? err.message : "Unexpected logout error";
     await logAuthEvent("auth.logout.error", { message });
     console.error("Auth logout unexpected error", err);
-    return res.status(500).json({ success: false, error: message });
+    return respondWithError(res, {
+      code: "INTERNAL_ERROR",
+      message,
+    });
   }
 };
 

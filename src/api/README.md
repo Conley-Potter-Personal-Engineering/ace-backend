@@ -21,6 +21,7 @@ Base path: `/api/`
 - `GET /api/artifacts/[id]` – fetch detail for a single artifact.
 - `POST /api/feedback` – record structured feedback; logs `feedback.recorded`.
 - `GET /api/system-events` – fetch recent system events (debug/live view).
+- `POST /api/system-events` – ingest system events (telemetry/observability).
 
 ### Request Notes
 - Headers: `x-api-key: <ACE_API_KEY>` (present for future enforcement).

@@ -128,6 +128,30 @@ export const listMetricsForPost = async (postId: string) => {
   return data ?? [];
 };
 
+/**
+ * Lists performance metrics for a set of post ids.
+ */
+export const listMetricsForPostIds = async (postIds: string[]) => {
+  if (!postIds.length) {
+    return [];
+  }
+
+  const { data, error } = await getSupabase()
+    .from("performance_metrics")
+    .select("*")
+    .in("post_id", postIds)
+    .order("collected_at", { ascending: false })
+    .returns<Tables<"performance_metrics">[]>();
+
+  if (error) {
+    throw new Error(
+      `Failed to list metrics for posts: ${error.message}`,
+    );
+  }
+
+  return data ?? [];
+};
+
 export const getLatestMetricsForPost = async (postId: string) => {
   const validatedPostId = identifierSchema.parse(postId);
   const { data, error } = await getSupabase()
