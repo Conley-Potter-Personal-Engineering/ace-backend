@@ -182,7 +182,7 @@ export const ScriptsListQuerySchema = PaginationQuerySchema.extend({
 export const VideosListQuerySchema = ScriptsListQuerySchema;
 
 export const PostsListQuerySchema = ScriptsListQuerySchema.extend({
-  platform: z.enum(["instagram", "tiktok", "youtube"]).optional(),
+  platform: z.enum(["youtube", "tiktok", "instagram", "facebook", "linkedin", "x"]).optional(),
   experiment_id: z.string().uuid("experiment_id must be a valid UUID").optional(),
 });
 

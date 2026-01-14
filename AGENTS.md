@@ -604,6 +604,11 @@ n8n workflows invoke agents via HTTP Request nodes:
 }
 ```
 
+### Authentication for Agent vs User Endpoints
+
+- Agent endpoints accept either `Authorization: Bearer <token>` or `x-api-key: <ACE_API_KEY>`.
+- User-facing endpoints (experiments, artifacts, workflows, etc.) require bearer tokens only.
+
 ### What Backend Should Provide
 
 - **Stable API contracts** — don't break endpoints n8n depends on

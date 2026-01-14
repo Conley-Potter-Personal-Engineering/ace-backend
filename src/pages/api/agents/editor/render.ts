@@ -42,4 +42,4 @@ async function handler(
   }
 }
 
-export default withAuth(handler);
+export default withAuth(handler, { allowApiKey: true });
