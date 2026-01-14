@@ -29,7 +29,7 @@ const MetadataSchema = PayloadSchema.superRefine((value, ctx) => {
         message: "metadata must be 10KB or smaller",
       });
     }
-  } catch (error) {
+  } catch {
     ctx.addIssue({
       code: z.ZodIssueCode.custom,
       message: "metadata must be JSON serializable",
