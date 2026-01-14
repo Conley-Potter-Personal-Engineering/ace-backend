@@ -42,12 +42,12 @@ const statusByCode: Record<ApiErrorCode, number> = {
 /**
  * Sends a standardized error response.
  */
-export const respondWithError = (
-  res: ApiResponseLike | undefined,
+export const respondWithError = <T>(
+  res: ApiResponseLike<T> | undefined,
   payload: ApiErrorPayload,
   statusOverride?: number,
 ) =>
-  respond(res, statusOverride ?? statusByCode[payload.code], {
+  respond(res as ApiResponseLike<any>, statusOverride ?? statusByCode[payload.code], {
     success: false,
     error: {
       code: payload.code,

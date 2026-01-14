@@ -1,4 +1,5 @@
-import { getScriptById, getVideoAssetById, listVideoAssets } from "../../repos";
+import { getScriptById } from "@/repos/scripts";
+import { getVideoAssetById, listVideoAssets } from "@/repos/videoAssets";
 import { ArtifactIdSchema, ArtifactsQuerySchema } from "../../schemas/apiSchemas";
 
 const truncate = (text: string, maxLength: number) => {

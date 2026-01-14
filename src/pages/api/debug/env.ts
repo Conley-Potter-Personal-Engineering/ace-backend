@@ -1,7 +1,7 @@
 import { methodNotAllowed, ok, type ApiRequest, type ApiResponseLike } from "@/api/http";
 import { withAuth } from "@/lib/api/middleware/auth";
 
-function handler(_req: ApiRequest, res: ApiResponseLike) {
+async function handler(_req: ApiRequest, res: ApiResponseLike) {
   if (_req.method && _req.method !== "GET") {
     return methodNotAllowed(res, ["GET"]);
   }

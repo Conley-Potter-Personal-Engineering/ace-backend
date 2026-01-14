@@ -5,9 +5,13 @@ export interface ApiRequest {
   headers?: Record<string, string | string[] | undefined>;
 }
 
+type JsonResponder<T> = {
+  bivarianceHack(body: T): ApiResponseLike<T> | void;
+}["bivarianceHack"];
+
 export interface ApiResponseLike<T = unknown> {
   status?: (statusCode: number) => ApiResponseLike<T>;
-  json?: (body: T) => ApiResponseLike<T> | void;
+  json?: JsonResponder<T>;
 }
 
 export interface HandlerReturn<T = unknown> {
