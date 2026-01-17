@@ -328,9 +328,8 @@ export const querySystemEvents = async (
     const trimmed = filters.search.trim();
     if (trimmed) {
       const escaped = trimmed.replace(/[%_]/g, "\\$&");
-      query = query.or(
-        `message.ilike.%${escaped}%,metadata::text.ilike.%${escaped}%`,
-      );
+      // Create a text representation search
+      query = query.textSearch("message", escaped);
     }
   }
 
