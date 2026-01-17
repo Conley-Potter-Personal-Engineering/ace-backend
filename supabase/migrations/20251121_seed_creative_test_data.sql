@@ -1,5 +1,4 @@
 BEGIN;
-
 -- Seed trend_snapshots with realistic test data
 INSERT INTO trend_snapshots (
   snapshot_id,
@@ -37,7 +36,6 @@ FROM (
     ('{health,habits,routine}'::text[]),
     ('{education,study,hacks}'::text[])
 ) AS v(tags);
-
 -- Seed creative_patterns with realistic test data
 INSERT INTO creative_patterns (
   pattern_id,
@@ -76,7 +74,6 @@ FROM (
     ('Your audience is scrolling for this', 'hook, context, benefit, CTA', '{bold, trendy}'::text[], '{excited, optimistic}'::text[], 'Trend awareness with payoff'),
     ('Make a week of content in 20 minutes', 'hook, walkthrough, proof, CTA', '{tutorial, efficient}'::text[], '{motivated, focused}'::text[], 'Speed-focused tutorial sequence')
 ) AS v(hook_text, structure, style_tags, emotion_tags, notes);
-
 -- Link products to snapshots and patterns in product_creative_contexts
 INSERT INTO product_creative_contexts (
   product_id,
@@ -95,5 +92,4 @@ SELECT
   )
 FROM products p
 CROSS JOIN LATERAL generate_series(1, (1 + floor(random() * 2))::int);
-
 COMMIT;

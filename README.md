@@ -113,6 +113,11 @@ Event definitions and naming conventions are in `architecture/events.md`.
 npm install
 ```
 
+## Authentication
+
+Agent endpoints accept either `Authorization: Bearer <token>` or `x-api-key: <ACE_API_KEY>`.
+User-facing endpoints (experiments, artifacts, workflows, etc.) require bearer tokens only.
+
 ### Supabase setup
 Ensure the Supabase CLI is installed.
 

@@ -20,8 +20,8 @@ async function handler(
   try {
     if (req.method === "GET") {
       const query = normalizeQuery(req.query);
-      const data = await listSystemEventsApi(query);
-      return ok(res, { success: true, data });
+      const result = await listSystemEventsApi(query);
+      return ok(res, { success: true, ...result });
     }
 
     if (req.method === "POST") {

@@ -29,11 +29,8 @@ create table if not exists scripts (
   creative_variables jsonb,
   created_at timestamptz default now()
 );
-
 create index if not exists idx_scripts_product_id
   on scripts(product_id);
-
-
 -- ============================
 -- 2. VIDEO ASSETS
 -- ============================
@@ -46,11 +43,8 @@ create table if not exists video_assets (
   duration_seconds int,
   created_at timestamptz default now()
 );
-
 create index if not exists idx_video_assets_script_id
   on video_assets(script_id);
-
-
 -- ============================
 -- 3. EXPERIMENTS
 -- ============================
@@ -64,17 +58,12 @@ create table if not exists experiments (
   variation_label text,
   created_at timestamptz default now()
 );
-
 create index if not exists idx_experiments_product_id
   on experiments(product_id);
-
 create index if not exists idx_experiments_script_id
   on experiments(script_id);
-
 create index if not exists idx_experiments_created_at
   on experiments(created_at);
-
-
 -- ============================
 -- 4. PUBLISHED POSTS
 -- ============================
@@ -89,14 +78,10 @@ create table if not exists published_posts (
   posted_at timestamptz,
   created_at timestamptz default now()
 );
-
 create index if not exists idx_published_posts_experiment_id
   on published_posts(experiment_id);
-
 create index if not exists idx_published_posts_platform
   on published_posts(platform);
-
-
 -- ============================
 -- 5. PERFORMANCE METRICS
 -- ============================
@@ -112,14 +97,10 @@ create table if not exists performance_metrics (
   completion_rate numeric,
   collected_at timestamptz default now()
 );
-
 create index if not exists idx_performance_metrics_post_id
   on performance_metrics(post_id);
-
 create index if not exists idx_performance_metrics_collected_at
   on performance_metrics(collected_at);
-
-
 -- ============================
 -- 6. SYSTEM EVENTS
 -- ============================
@@ -131,17 +112,12 @@ create table if not exists system_events (
   payload jsonb,
   created_at timestamptz default now()
 );
-
 create index if not exists idx_system_events_agent_name
   on system_events(agent_name);
-
 create index if not exists idx_system_events_event_type
   on system_events(event_type);
-
 create index if not exists idx_system_events_created_at
   on system_events(created_at);
-
-
 -- ============================
 -- 7. OPTIONAL INDEXES ON EXISTING TABLES
 -- ============================
@@ -151,15 +127,12 @@ create index if not exists idx_system_events_created_at
 -- creative_patterns.product_id
 create index if not exists idx_creative_patterns_product_id
   on creative_patterns(product_id);
-
 -- trend_snapshots.product_id
 create index if not exists idx_trend_snapshots_product_id
   on trend_snapshots(product_id);
-
 -- raw_videos.platform + external_id
 create index if not exists idx_raw_videos_platform_external
   on raw_videos(platform, external_id);
-
 -- ============================================================
 -- END OF MIGRATION
--- ============================================================
+-- ============================================================;

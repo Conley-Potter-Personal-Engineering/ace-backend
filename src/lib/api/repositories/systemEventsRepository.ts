@@ -1,6 +1,12 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { Database, Tables } from "@/db/types";
-import { logSystemEvent } from "@/repos/systemEvents";
+import {
+  fetchSystemEventById,
+  listSystemEventsByCorrelationId,
+  listSystemEventsByWorkflowId,
+  logSystemEvent,
+  querySystemEvents,
+} from "@/repos/systemEvents";
 import type { SystemEventCreateInput } from "@/schemas/systemEventsSchema";
 
 export const createSystemEvent = async (
@@ -23,4 +29,48 @@ export const createSystemEvent = async (
     },
     supabase,
   );
+};
+
+export interface SystemEventsFilters {
+  severity?: "debug" | "info" | "warning" | "error" | "critical";
+  agent_name?: string;
+  event_type?: string;
+  event_category?: "workflow" | "agent" | "system" | "integration";
+  workflow_id?: string;
+  correlation_id?: string;
+  start_date?: string;
+  end_date?: string;
+  search?: string;
+  limit?: number;
+  offset?: number;
+}
+
+export const getSystemEvents = async (
+  supabase: SupabaseClient<Database>,
+  filters: SystemEventsFilters,
+): Promise<{ events: Tables<"system_events">[]; total: number }> => {
+  return querySystemEvents(filters, supabase);
+};
+
+export const getSystemEventById = async (
+  supabase: SupabaseClient<Database>,
+  eventId: string,
+): Promise<Tables<"system_events"> | null> => {
+  return fetchSystemEventById(eventId, supabase);
+};
+
+export const getSystemEventsByCorrelationId = async (
+  supabase: SupabaseClient<Database>,
+  correlationId: string,
+  options?: { excludeEventId?: string; limit?: number },
+): Promise<Tables<"system_events">[]> => {
+  return listSystemEventsByCorrelationId(correlationId, options, supabase);
+};
+
+export const getSystemEventsByWorkflowId = async (
+  supabase: SupabaseClient<Database>,
+  workflowId: string,
+  options?: { excludeEventId?: string; limit?: number },
+): Promise<Tables<"system_events">[]> => {
+  return listSystemEventsByWorkflowId(workflowId, options, supabase);
 };

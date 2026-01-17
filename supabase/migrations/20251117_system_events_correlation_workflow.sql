@@ -5,13 +5,10 @@
 alter table if exists system_events
   add column if not exists correlation_id text,
   add column if not exists workflow_id text;
-
 create index if not exists idx_system_events_correlation_id
   on system_events(correlation_id);
-
 create index if not exists idx_system_events_workflow_id
   on system_events(workflow_id);
-
 do $$
 declare
   event_col text;
@@ -62,13 +59,11 @@ begin
     );
   end if;
 end $$;
-
 update system_events
 set correlation_id = payload->>'correlationId'
 where correlation_id is null
   and payload is not null
   and payload ? 'correlationId';
-
 update system_events
 set workflow_id = coalesce(payload->>'workflowId', payload->>'workflow')
 where workflow_id is null
@@ -77,7 +72,6 @@ where workflow_id is null
     payload ? 'workflowId'
     or payload ? 'workflow'
   );
-
 -- ============================================================
 -- End of migration
--- ============================================================
+-- ============================================================;

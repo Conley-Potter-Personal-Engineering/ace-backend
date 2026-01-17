@@ -10,6 +10,5 @@ CREATE TABLE IF NOT EXISTS style_templates (
   created_at TIMESTAMPTZ DEFAULT NOW(),
   updated_at TIMESTAMPTZ DEFAULT NOW()
 );
-
 CREATE INDEX IF NOT EXISTS idx_style_templates_active
   ON style_templates(is_active);

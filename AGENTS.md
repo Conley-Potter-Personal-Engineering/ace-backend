@@ -116,6 +116,9 @@ npm run dev
 npm run build
 npm run lint
 npm run test
+npm run test:unit
+npm run test:integration
+npm run test:unit -- tests/unit/api/system-events-detail.test.ts # example of running an individual test, which you are allowed to do
 npm run typecheck
 npm run generate:types   # refresh Supabase types
 ```
@@ -603,6 +606,11 @@ n8n workflows invoke agents via HTTP Request nodes:
   }
 }
 ```
+
+### Authentication for Agent vs User Endpoints
+
+- Agent endpoints accept either `Authorization: Bearer <token>` or `x-api-key: <ACE_API_KEY>`.
+- User-facing endpoints (experiments, artifacts, workflows, etc.) require bearer tokens only.
 
 ### What Backend Should Provide
 
