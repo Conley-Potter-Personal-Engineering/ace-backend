@@ -9,12 +9,10 @@ ALTER TABLE public.products
   ADD COLUMN IF NOT EXISTS key_features jsonb NOT NULL DEFAULT '[]'::jsonb,
   ADD COLUMN IF NOT EXISTS objections jsonb NOT NULL DEFAULT '[]'::jsonb,
   ADD COLUMN IF NOT EXISTS demo_ideas jsonb NOT NULL DEFAULT '[]'::jsonb;
-
 CREATE INDEX IF NOT EXISTS products_status_idx ON public.products (status);
 CREATE INDEX IF NOT EXISTS products_source_platform_idx ON public.products (source_platform);
 CREATE INDEX IF NOT EXISTS products_category_idx ON public.products (category);
 CREATE INDEX IF NOT EXISTS products_price_usd_idx ON public.products (price_usd);
-
 INSERT INTO public.products (
   name,
   source_platform,
@@ -114,7 +112,6 @@ WHERE NOT EXISTS (
   WHERE name = 'AquaPulse Portable Water Flosser (Cordless, USB-C)'
     AND source_platform = 'tiktok_shop'
 );
-
 INSERT INTO public.products (
   name,
   source_platform,
@@ -214,7 +211,6 @@ WHERE NOT EXISTS (
   WHERE name = 'LunaTwist Heatless Curling Set (Overnight Curls, No Heat)'
     AND source_platform = 'tiktok_shop'
 );
-
 INSERT INTO public.products (
   name,
   source_platform,
@@ -314,7 +310,6 @@ WHERE NOT EXISTS (
   WHERE name = 'StepQuiet Under-Desk Walking Pad (Quiet Motor, Compact)'
     AND source_platform = 'amazon_affiliate'
 );
-
 INSERT INTO public.products (
   name,
   source_platform,

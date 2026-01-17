@@ -180,3 +180,84 @@ export const fetchRecentSystemEvents = async (limit = 50) => {
 
   return data ?? [];
 };
+
+export interface SystemEventsFilters {
+  severity?: "debug" | "info" | "warning" | "error" | "critical";
+  agent_name?: string;
+  event_type?: string;
+  event_category?: "workflow" | "agent" | "system" | "integration";
+  workflow_id?: string;
+  correlation_id?: string;
+  start_date?: string;
+  end_date?: string;
+  search?: string;
+  limit?: number;
+  offset?: number;
+}
+
+export const querySystemEvents = async (
+  filters: SystemEventsFilters,
+  supabase: SupabaseClient<Database> = getSupabase(),
+) => {
+  let query = supabase
+    .from("system_events")
+    .select("*", { count: "exact" })
+    .order("created_at", { ascending: false });
+
+  if (filters.severity) {
+    query = query.eq("severity", filters.severity);
+  }
+
+  if (filters.agent_name) {
+    query = query.eq("agent_name", filters.agent_name);
+  }
+
+  if (filters.event_type) {
+    query = query.eq("event_type", filters.event_type);
+  }
+
+  if (filters.event_category) {
+    query = query.eq("event_category", filters.event_category);
+  }
+
+  if (filters.workflow_id) {
+    query = query.eq("workflow_id", filters.workflow_id);
+  }
+
+  if (filters.correlation_id) {
+    query = query.eq("correlation_id", filters.correlation_id);
+  }
+
+  if (filters.start_date) {
+    query = query.gte("created_at", filters.start_date);
+  }
+
+  if (filters.end_date) {
+    query = query.lte("created_at", filters.end_date);
+  }
+
+  if (filters.search) {
+    const trimmed = filters.search.trim();
+    if (trimmed) {
+      const escaped = trimmed.replace(/[%_]/g, "\\$&");
+      query = query.or(
+        `message.ilike.%${escaped}%,metadata::text.ilike.%${escaped}%`,
+      );
+    }
+  }
+
+  const limit = filters.limit ?? 100;
+  const offset = filters.offset ?? 0;
+  query = query.range(offset, Math.max(offset + limit - 1, offset));
+
+  const { data, error, count } = await query.returns<Tables<"system_events">[]>();
+
+  if (error) {
+    throw new Error(`Failed to list system events: ${error.message}`);
+  }
+
+  return {
+    events: data ?? [],
+    total: count ?? 0,
+  };
+};

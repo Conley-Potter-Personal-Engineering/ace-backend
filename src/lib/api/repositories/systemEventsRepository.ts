@@ -1,6 +1,6 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { Database, Tables } from "@/db/types";
-import { logSystemEvent } from "@/repos/systemEvents";
+import { logSystemEvent, querySystemEvents } from "@/repos/systemEvents";
 import type { SystemEventCreateInput } from "@/schemas/systemEventsSchema";
 
 export const createSystemEvent = async (
@@ -23,4 +23,25 @@ export const createSystemEvent = async (
     },
     supabase,
   );
+};
+
+export interface SystemEventsFilters {
+  severity?: "debug" | "info" | "warning" | "error" | "critical";
+  agent_name?: string;
+  event_type?: string;
+  event_category?: "workflow" | "agent" | "system" | "integration";
+  workflow_id?: string;
+  correlation_id?: string;
+  start_date?: string;
+  end_date?: string;
+  search?: string;
+  limit?: number;
+  offset?: number;
+}
+
+export const getSystemEvents = async (
+  supabase: SupabaseClient<Database>,
+  filters: SystemEventsFilters,
+): Promise<{ events: Tables<"system_events">[]; total: number }> => {
+  return querySystemEvents(filters, supabase);
 };
