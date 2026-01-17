@@ -116,6 +116,9 @@ npm run dev
 npm run build
 npm run lint
 npm run test
+npm run test:unit
+npm run test:integration
+npm run test:unit -- tests/unit/api/system-events-detail.test.ts # example of running an individual test, which you are allowed to do
 npm run typecheck
 npm run generate:types   # refresh Supabase types
 ```

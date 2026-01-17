@@ -87,6 +87,94 @@ export const getSystemEventById = async (eventId: string) => {
   return data;
 };
 
+export const fetchSystemEventById = async (
+  eventId: string,
+  supabase: SupabaseClient<Database> = getSupabase(),
+) => {
+  const validatedId = eventIdSchema.parse(eventId);
+  const { data, error } = await supabase
+    .from("system_events")
+    .select("*")
+    .eq("event_id", validatedId)
+    .returns<Tables<"system_events">[]>()
+    .maybeSingle();
+
+  if (error) {
+    throw new Error(
+      `Failed to fetch system event ${validatedId}: ${error.message}`,
+    );
+  }
+
+  return data;
+};
+
+const sanitizeLimit = (limit: number | undefined, max: number) => {
+  if (!Number.isInteger(limit) || (limit ?? 0) <= 0) {
+    return max;
+  }
+  return Math.min(limit as number, max);
+};
+
+export const listSystemEventsByCorrelationId = async (
+  correlationId: string,
+  options?: { excludeEventId?: string; limit?: number },
+  supabase: SupabaseClient<Database> = getSupabase(),
+) => {
+  const validatedCorrelation = identifierSchema.parse(correlationId);
+  const sanitizedLimit = sanitizeLimit(options?.limit, 50);
+
+  let query = supabase
+    .from("system_events")
+    .select("*")
+    .eq("correlation_id", validatedCorrelation)
+    .order("created_at", { ascending: true })
+    .limit(sanitizedLimit);
+
+  if (options?.excludeEventId) {
+    query = query.neq("event_id", options.excludeEventId);
+  }
+
+  const { data, error } = await query.returns<Tables<"system_events">[]>();
+
+  if (error) {
+    throw new Error(
+      `Failed to list system events by correlation_id ${validatedCorrelation}: ${error.message}`,
+    );
+  }
+
+  return data ?? [];
+};
+
+export const listSystemEventsByWorkflowId = async (
+  workflowId: string,
+  options?: { excludeEventId?: string; limit?: number },
+  supabase: SupabaseClient<Database> = getSupabase(),
+) => {
+  const validatedWorkflow = identifierSchema.parse(workflowId);
+  const sanitizedLimit = sanitizeLimit(options?.limit, 50);
+
+  let query = supabase
+    .from("system_events")
+    .select("*")
+    .eq("workflow_id", validatedWorkflow)
+    .order("created_at", { ascending: true })
+    .limit(sanitizedLimit);
+
+  if (options?.excludeEventId) {
+    query = query.neq("event_id", options.excludeEventId);
+  }
+
+  const { data, error } = await query.returns<Tables<"system_events">[]>();
+
+  if (error) {
+    throw new Error(
+      `Failed to list system events by workflow_id ${validatedWorkflow}: ${error.message}`,
+    );
+  }
+
+  return data ?? [];
+};
+
 export const updateSystemEvent = async (
   eventId: string,
   changes: TablesUpdate<"system_events">,

@@ -197,6 +197,7 @@ export const ExperimentsListQuerySchema = PaginationQuerySchema.extend({
 });
 
 export const ExperimentIdParamSchema = z.string().uuid("id must be a valid UUID");
+export const SystemEventIdParamSchema = z.string().uuid("id must be a valid UUID");
 
 export const ScriptsListQuerySchema = PaginationQuerySchema.extend({
   product_id: z.string().uuid("product_id must be a valid UUID").optional(),
