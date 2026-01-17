@@ -196,6 +196,34 @@ export const ExperimentsListQuerySchema = PaginationQuerySchema.extend({
     .optional(),
 });
 
+export const PerformanceMetricsQuerySchema = z
+  .object({
+    start_date: DateTimeQuerySchema,
+    end_date: DateTimeQuerySchema,
+    platform: z
+      .enum([
+        "instagram",
+        "tiktok",
+        "youtube",
+        "facebook",
+        "linkedin",
+        "x",
+        "all",
+      ])
+      .default("all"),
+    experiment_id: z.string().uuid("experiment_id must be a valid UUID").optional(),
+    product_id: z.string().uuid("product_id must be a valid UUID").optional(),
+    granularity: z.enum(["hour", "day", "week"]).default("day"),
+  })
+  .refine(
+    (value) =>
+      new Date(value.end_date).getTime() >= new Date(value.start_date).getTime(),
+    {
+      message: "end_date must be on or after start_date",
+      path: ["end_date"],
+    },
+  );
+
 export const ExperimentIdParamSchema = z.string().uuid("id must be a valid UUID");
 export const SystemEventIdParamSchema = z.string().uuid("id must be a valid UUID");
 
