@@ -60,6 +60,7 @@ export const getPostsByFilters = async (
     throw new Error(`Failed to fetch posts for performance metrics: ${error.message}`);
   }
 
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   return (data ?? []).map(({ experiments, ...post }) => post);
 };
 
