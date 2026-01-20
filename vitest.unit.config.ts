@@ -13,6 +13,7 @@ export default defineConfig({
   test: {
     environment: "node",
     include: ["tests/unit/**/*.test.ts"],
+    exclude: ["**/.pnpm-store/**", "**/node_modules/**"],
     setupFiles: ["./tests/utils/setupUnitTests.ts"],
     clearMocks: true,
     restoreMocks: true,

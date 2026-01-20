@@ -110,11 +110,17 @@ export const getExperimentsWithProductsByPostIds = async (
   }
 
   return (data ?? [])
-    .filter((row) => row.experiments?.experiment_id)
-    .map((row) => ({
-      post_id: row.post_id,
-      experiment_id: row.experiments?.experiment_id ?? row.experiment_id,
-      platform: row.platform,
-      product_name: row.experiments?.products?.name ?? null,
-    }));
+    .map((row) => {
+      const experimentId = row.experiments?.experiment_id ?? row.experiment_id;
+      if (!experimentId) {
+        return null;
+      }
+      return {
+        post_id: row.post_id,
+        experiment_id: experimentId,
+        platform: row.platform,
+        product_name: row.experiments?.products?.name ?? null,
+      };
+    })
+    .filter((row): row is ExperimentWithProduct => row !== null);
 };
