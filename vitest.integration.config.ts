@@ -13,6 +13,7 @@ export default defineConfig({
   test: {
     environment: "node",
     include: ["tests/integration/**/*.test.ts"],
+    exclude: ["**/.pnpm-store/**", "**/node_modules/**"],
     setupFiles: ["./tests/integration/setup.ts"],
     envFile: ["./config/.env.test", "./config/.env.local"],
     testTimeout: 30000,

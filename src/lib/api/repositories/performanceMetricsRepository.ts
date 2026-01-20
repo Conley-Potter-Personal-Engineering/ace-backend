@@ -60,6 +60,7 @@ export const getPostsByFilters = async (
     throw new Error(`Failed to fetch posts for performance metrics: ${error.message}`);
   }
 
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   return (data ?? []).map(({ experiments, ...post }) => post);
 };
 
@@ -110,11 +111,17 @@ export const getExperimentsWithProductsByPostIds = async (
   }
 
   return (data ?? [])
-    .filter((row) => row.experiments?.experiment_id)
-    .map((row) => ({
-      post_id: row.post_id,
-      experiment_id: row.experiments?.experiment_id ?? row.experiment_id,
-      platform: row.platform,
-      product_name: row.experiments?.products?.name ?? null,
-    }));
+    .map((row) => {
+      const experimentId = row.experiments?.experiment_id ?? row.experiment_id;
+      if (!experimentId) {
+        return null;
+      }
+      return {
+        post_id: row.post_id,
+        experiment_id: experimentId,
+        platform: row.platform,
+        product_name: row.experiments?.products?.name ?? null,
+      };
+    })
+    .filter((row): row is ExperimentWithProduct => row !== null);
 };
