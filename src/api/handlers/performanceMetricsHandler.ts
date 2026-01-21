@@ -3,6 +3,7 @@ import { getSupabase } from "@/db/supabase";
 import {
   getExperimentsWithProductsByPostIds,
   getMetricsByPostsAndDateRange,
+  getPostMetrics,
   getPostsByFilters,
 } from "@/lib/api/repositories/performanceMetricsRepository";
 import {
@@ -11,7 +12,7 @@ import {
   rankExperimentsByScore,
   type Granularity,
 } from "@/lib/api/utils/metricsAggregation";
-import { PerformanceMetricsQuerySchema } from "@/schemas/apiSchemas";
+import { PerformanceMetricsQuerySchema, PostIdParamSchema } from "@/schemas/apiSchemas";
 
 interface SummaryTotals {
   total_views: number;
@@ -167,4 +168,10 @@ export const getPerformanceMetricsApi = async (
     time_series: timeSeriesWithPlatform,
     top_experiments: topExperiments,
   };
+};
+
+export const getPostPerformanceMetricsApi = async (postId: string) => {
+  const validatedId = PostIdParamSchema.parse(postId);
+  const supabase = getSupabase();
+  return getPostMetrics(supabase, validatedId);
 };

@@ -16,6 +16,22 @@ export interface ExperimentWithProduct {
   product_name: string | null;
 }
 
+type MetricName = "views" | "likes" | "comments" | "shares" | "watch_time_avg";
+
+export interface PostMetricEntry {
+  metric_name: MetricName;
+  value: number;
+  collected_at: string;
+}
+
+export interface PostMetricsData {
+  post_id: string;
+  platform: string;
+  external_post_id: string | null;
+  metrics: PostMetricEntry[];
+  last_updated: string | null;
+}
+
 type PublishedPostRow = Tables<"published_posts"> & {
   experiments?: {
     product_id: string | null;
@@ -124,4 +140,82 @@ export const getExperimentsWithProductsByPostIds = async (
       };
     })
     .filter((row): row is ExperimentWithProduct => row !== null);
+};
+
+export const getPostMetrics = async (
+  supabase: SupabaseClient<Database>,
+  postId: string,
+): Promise<PostMetricsData | null> => {
+  const { data: post, error: postError } = await supabase
+    .from("published_posts")
+    .select("post_id, platform, platform_post_id")
+    .eq("post_id", postId)
+    .returns<Tables<"published_posts">[]>()
+    .maybeSingle();
+
+  if (postError) {
+    throw new Error(`Failed to fetch post for metrics: ${postError.message}`);
+  }
+
+  if (!post) {
+    return null;
+  }
+
+  const { data: metricsRows, error: metricsError } = await supabase
+    .from("performance_metrics")
+    .select("collected_at, view_count, like_count, comment_count, share_count, watch_time_ms")
+    .eq("post_id", postId)
+    .order("collected_at", { ascending: true })
+    .returns<Tables<"performance_metrics">[]>();
+
+  if (metricsError) {
+    throw new Error(`Failed to fetch performance metrics: ${metricsError.message}`);
+  }
+
+  const metrics: PostMetricEntry[] = [];
+  let latestCollectedAt: string | null = null;
+
+  const pushMetric = (
+    metricName: MetricName,
+    value: number | null,
+    collectedAt: string | null,
+  ) => {
+    if (value === null || value === undefined || !collectedAt) {
+      return;
+    }
+    metrics.push({
+      metric_name: metricName,
+      value,
+      collected_at: collectedAt,
+    });
+  };
+
+  for (const row of metricsRows ?? []) {
+    if (row.collected_at) {
+      if (!latestCollectedAt || row.collected_at > latestCollectedAt) {
+        latestCollectedAt = row.collected_at;
+      }
+    }
+
+    pushMetric("views", row.view_count, row.collected_at);
+    pushMetric("likes", row.like_count, row.collected_at);
+    pushMetric("comments", row.comment_count, row.collected_at);
+    pushMetric("shares", row.share_count, row.collected_at);
+    pushMetric("watch_time_avg", row.watch_time_ms, row.collected_at);
+  }
+
+  metrics.sort((a, b) => {
+    if (a.metric_name !== b.metric_name) {
+      return a.metric_name.localeCompare(b.metric_name);
+    }
+    return a.collected_at.localeCompare(b.collected_at);
+  });
+
+  return {
+    post_id: post.post_id,
+    platform: post.platform,
+    external_post_id: post.platform_post_id ?? null,
+    metrics,
+    last_updated: latestCollectedAt,
+  };
 };

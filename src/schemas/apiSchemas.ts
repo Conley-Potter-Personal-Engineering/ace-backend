@@ -226,6 +226,7 @@ export const PerformanceMetricsQuerySchema = z
 
 export const ExperimentIdParamSchema = z.string().uuid("id must be a valid UUID");
 export const SystemEventIdParamSchema = z.string().uuid("id must be a valid UUID");
+export const PostIdParamSchema = z.string().uuid("id must be a valid UUID");
 
 export const ScriptsListQuerySchema = PaginationQuerySchema.extend({
   product_id: z.string().uuid("product_id must be a valid UUID").optional(),
