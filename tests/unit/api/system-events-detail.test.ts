@@ -1,19 +1,13 @@
 import { describe, expect, it, vi } from "vitest";
 import { getSystemEventDetailApi } from "@/api/handlers/systemEventsHandler";
 
-vi.mock("@/lib/api/repositories/systemEventsRepository", () => ({
-  getSystemEvents: vi.fn(),
-  createSystemEvent: vi.fn(),
+vi.mock("@/repos/systemEvents", () => ({
   getSystemEventById: vi.fn(),
-  getSystemEventsByCorrelationId: vi.fn(),
-  getSystemEventsByWorkflowId: vi.fn(),
+  listSystemEventsByCorrelationId: vi.fn(),
+  listSystemEventsByWorkflowId: vi.fn(),
 }));
 
-vi.mock("@/db/supabase", () => ({
-  getSupabase: vi.fn(() => ({ name: "supabase" })),
-}));
-
-const repo = await import("@/lib/api/repositories/systemEventsRepository");
+const repo = await import("@/repos/systemEvents");
 
 describe("getSystemEventDetailApi", () => {
   it("returns null when event is not found", async () => {
@@ -40,7 +34,7 @@ describe("getSystemEventDetailApi", () => {
       metadata: { detail: "alpha" },
     } as any);
 
-    vi.mocked(repo.getSystemEventsByCorrelationId).mockResolvedValue([
+    vi.mocked(repo.listSystemEventsByCorrelationId).mockResolvedValue([
       {
         event_id: "event-2",
         created_at: "2024-01-01T00:01:00.000Z",
@@ -54,8 +48,8 @@ describe("getSystemEventDetailApi", () => {
       "d290f1ee-6c54-4b01-90e6-d701748f0851",
     );
 
-    expect(repo.getSystemEventsByCorrelationId).toHaveBeenCalled();
-    expect(repo.getSystemEventsByWorkflowId).not.toHaveBeenCalled();
+    expect(repo.listSystemEventsByCorrelationId).toHaveBeenCalled();
+    expect(repo.listSystemEventsByWorkflowId).not.toHaveBeenCalled();
     expect(result?.related_events).toEqual([
       {
         id: "event-2",
@@ -81,7 +75,7 @@ describe("getSystemEventDetailApi", () => {
       metadata: null,
     } as any);
 
-    vi.mocked(repo.getSystemEventsByWorkflowId).mockResolvedValue([
+    vi.mocked(repo.listSystemEventsByWorkflowId).mockResolvedValue([
       {
         event_id: "event-4",
         created_at: "2024-01-02T00:02:00.000Z",
@@ -95,7 +89,7 @@ describe("getSystemEventDetailApi", () => {
       "f290f1ee-6c54-4b01-90e6-d701748f0851",
     );
 
-    expect(repo.getSystemEventsByWorkflowId).toHaveBeenCalled();
+    expect(repo.listSystemEventsByWorkflowId).toHaveBeenCalled();
     expect(result?.related_events).toHaveLength(1);
     expect(result?.related_events[0].id).toBe("event-4");
   });

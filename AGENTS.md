@@ -88,10 +88,6 @@ root/
     pages/api/       — Next.js API routes (agent HTTP endpoints)
   supabase/
     migrations/      — SQL migrations
-architecture/
-  agents/            — agent specification documents
-  [schema.md](http://schema.md)          — full database schema
-  [events.md](http://events.md)          — system event taxonomy
 [README.md](http://README.md)            — human-facing project overview
 [AGENTS.md](http://AGENTS.md)            — this file
 ```
@@ -128,6 +124,39 @@ If a new migration is created:
 ```bash
 supabase db push
 ```
+
+---
+
+## File Structure Conventions
+
+### Repository Pattern
+- **All repositories MUST be placed in `src/repos/`** (never in `src/lib/api/repositories/` or any other location)
+- Repositories are data access patterns used across the entire backend
+- Examples: `src/repos/performanceMetrics.ts`, `src/repos/systemEvents.ts`, `src/repos/scripts.ts`
+- Never create repositories in API-specific folders
+
+### API Route-Specific Code
+- **API route middleware**: `src/lib/api/middleware/`
+  - Examples: `apiKeyAuth.ts`, `auth.ts`, `errorHandler.ts`
+  - Use for middleware that only applies to Next.js API routes
+- **API route utilities**: `src/lib/api/utils/`
+  - Examples: `metricsAggregation.ts`, `pagination.ts`, `queryBuilder.ts`
+  - Use for utilities exclusively used within `/api` routes
+
+### General/Shared Code
+- **General middleware**: `src/middleware/`
+  - Examples: `withAuth.ts`
+  - Use for middleware that applies across the application
+- **General utilities**: `src/utils/`
+  - Examples: `env.ts`, `logger.ts`, `storageUploader.ts`
+  - Use for utilities shared across the entire codebase
+
+### Decision Tree for File Placement
+1. Is it a repository (data access layer)? → `src/repos/`
+2. Is it middleware only for API routes? → `src/lib/api/middleware/`
+3. Is it a utility only for API routes? → `src/lib/api/utils/`
+4. Is it general middleware? → `src/middleware/`
+5. Is it a general utility? → `src/utils/`
 
 ---
 
@@ -705,7 +734,6 @@ When prompting AI coding agents to work on ACE backend:
 ### Provide Context
 
 - Reference this [AGENTS.md](http://AGENTS.md) file
-- Include relevant schema from `architecture/[schema.md](http://schema.md)`
 - Link to agent specification docs
 - Clarify which agent or endpoint is being modified
 
@@ -765,9 +793,6 @@ Explanations help with:
 
 AI agents should be familiar with these architecture documents:
 
-- `architecture/[schema.md](http://schema.md)` — Database schema
-- `architecture/[events.md](http://events.md)` — Event taxonomy
-- `architecture/agents/` — Agent specifications
 - ACE Backend API Reference — Full API documentation
 - ACE Architecture Update: Introduction of n8n Orchestration Layer — Architectural context
 - Publisher Agent Architectural Update: Hybrid n8n-Backend Model — Publishing architecture
