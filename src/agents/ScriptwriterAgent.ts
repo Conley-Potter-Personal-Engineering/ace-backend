@@ -64,8 +64,6 @@ interface WorkflowContext {
   trendSnapshotId: string | null;
 }
 
- 
-
 const formatScriptText = (output: ScriptOutputType): string => {
   const outline = output.outline.length
     ? output.outline.map((beat, index) => `${index + 1}. ${beat}`).join("\n")

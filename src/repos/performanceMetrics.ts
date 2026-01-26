@@ -370,6 +370,17 @@ export const getPostMetrics = async (postId: string): Promise<PostMetricsData | 
   const metrics: PostMetricEntry[] = [];
   let latestCollectedAt: string | null = null;
 
+  const normalizeTimestamp = (value: string | null): string | null => {
+    if (!value) {
+      return null;
+    }
+    const parsed = new Date(value);
+    if (Number.isNaN(parsed.getTime())) {
+      return value;
+    }
+    return parsed.toISOString();
+  };
+
   const pushMetric = (
     metricName: MetricName,
     value: number | null,
@@ -378,17 +389,22 @@ export const getPostMetrics = async (postId: string): Promise<PostMetricsData | 
     if (value === null || value === undefined || !collectedAt) {
       return;
     }
+    const normalized = normalizeTimestamp(collectedAt);
+    if (!normalized) {
+      return;
+    }
     metrics.push({
       metric_name: metricName,
       value,
-      collected_at: collectedAt,
+      collected_at: normalized,
     });
   };
 
   for (const row of metricsRows ?? []) {
-    if (row.collected_at) {
-      if (!latestCollectedAt || row.collected_at > latestCollectedAt) {
-        latestCollectedAt = row.collected_at;
+    const normalizedCollectedAt = normalizeTimestamp(row.collected_at);
+    if (normalizedCollectedAt) {
+      if (!latestCollectedAt || normalizedCollectedAt > latestCollectedAt) {
+        latestCollectedAt = normalizedCollectedAt;
       }
     }
 
