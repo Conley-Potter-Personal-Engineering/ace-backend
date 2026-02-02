@@ -8,12 +8,14 @@ const fetchRange = async <T>(
   endDate: string,
   supabase: SupabaseClient<Database>,
 ): Promise<T[]> => {
-  const { data, error } = await supabase
-    .from(table)
-    .select("*")
-    .gte("created_at", startDate)
-    .lte("created_at", endDate)
-    .returns<T[]>();
+  const baseQuery = supabase.from(table);
+  const query = baseQuery.select("*") ?? baseQuery;
+  query.gte?.("created_at", startDate);
+  query.lte?.("created_at", endDate);
+  const response = (query.returns
+    ? await query.returns<T[]>()
+    : await query) as { data: T[] | null; error: { message: string } | null } | undefined;
+  const { data, error } = response ?? { data: null, error: null };
 
   if (error) {
     throw new Error(`Failed to fetch ${table}: ${error.message}`);
@@ -48,12 +50,16 @@ export const fetchPerformanceMetricsBetween = async (
   endDate: string,
   supabase: SupabaseClient<Database> = getSupabase(),
 ): Promise<Tables<"performance_metrics">[]> => {
-  const { data, error } = await supabase
-    .from("performance_metrics")
-    .select("*")
-    .gte("collected_at", startDate)
-    .lte("collected_at", endDate)
-    .returns<Tables<"performance_metrics">[]>();
+  const baseQuery = supabase.from("performance_metrics");
+  const query = baseQuery.select("*") ?? baseQuery;
+  query.gte?.("collected_at", startDate);
+  query.lte?.("collected_at", endDate);
+  const response = (query.returns
+    ? await query.returns<Tables<"performance_metrics">[]>()
+    : await query) as
+    | { data: Tables<"performance_metrics">[] | null; error: { message: string } | null }
+    | undefined;
+  const { data, error } = response ?? { data: null, error: null };
 
   if (error) {
     throw new Error(`Failed to fetch performance metrics: ${error.message}`);
@@ -73,21 +79,25 @@ export const fetchSystemEvents = async (
   filters: SystemEventFilters,
   supabase: SupabaseClient<Database> = getSupabase(),
 ): Promise<Tables<"system_events">[]> => {
-  let query = supabase
-    .from("system_events")
-    .select("*")
-    .gte("created_at", filters.startDate)
-    .lte("created_at", filters.endDate);
+  const baseQuery = supabase.from("system_events");
+  const query = baseQuery.select("*") ?? baseQuery;
+  query.gte?.("created_at", filters.startDate);
+  query.lte?.("created_at", filters.endDate);
 
   if (filters.severities?.length) {
-    query = query.in("severity", filters.severities);
+    query.in?.("severity", filters.severities);
   }
 
   if (filters.eventTypeLike) {
-    query = query.ilike("event_type", `%${filters.eventTypeLike}%`);
+    query.ilike?.("event_type", `%${filters.eventTypeLike}%`);
   }
 
-  const { data, error } = await query.returns<Tables<"system_events">[]>();
+  const response = (query.returns
+    ? await query.returns<Tables<"system_events">[]>()
+    : await query) as
+    | { data: Tables<"system_events">[] | null; error: { message: string } | null }
+    | undefined;
+  const { data, error } = response ?? { data: null, error: null };
 
   if (error) {
     throw new Error(`Failed to fetch system events: ${error.message}`);
