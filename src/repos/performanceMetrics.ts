@@ -177,6 +177,8 @@ export interface PostFilters {
   platform?: Platform;
   experiment_id?: string;
   product_id?: string;
+  start_date?: string;
+  end_date?: string;
 }
 
 export interface ExperimentWithProduct {
@@ -227,11 +229,23 @@ const platformSchema = z.enum([
   "x",
 ]);
 
-const postFiltersSchema = z.object({
-  platform: platformSchema.optional(),
-  experiment_id: identifierSchema.optional(),
-  product_id: identifierSchema.optional(),
-});
+const postFiltersSchema = z
+  .object({
+    platform: platformSchema.optional(),
+    experiment_id: identifierSchema.optional(),
+    product_id: identifierSchema.optional(),
+    start_date: z.string().trim().min(1).optional(),
+    end_date: z.string().trim().min(1).optional(),
+  })
+  .refine(
+    (value) =>
+      (!value.start_date && !value.end_date) ||
+      (value.start_date && value.end_date),
+    {
+      message: "start_date and end_date must be provided together",
+      path: ["start_date"],
+    },
+  );
 
 const dateRangeSchema = z.object({
   startDate: z.string().trim().min(1),
@@ -260,6 +274,14 @@ export const getPostsByFilters = async (
 
   if (validated.product_id) {
     query = query.eq("experiments.product_id", validated.product_id);
+  }
+
+  if (validated.start_date && validated.end_date) {
+    const { startDate, endDate } = dateRangeSchema.parse({
+      startDate: validated.start_date,
+      endDate: validated.end_date,
+    });
+    query = query.gte("posted_at", startDate).lte("posted_at", endDate);
   }
 
   const { data, error } = await query.returns<PublishedPostRow[]>();

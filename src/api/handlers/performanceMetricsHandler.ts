@@ -130,6 +130,8 @@ export const getPerformanceMetricsApi = async (
     platform: platformFilter === "all" ? undefined : platformFilter,
     experiment_id: parsed.experiment_id,
     product_id: parsed.product_id,
+    start_date: parsed.start_date,
+    end_date: parsed.end_date,
   });
 
   const postIds = posts.map((post) => post.post_id);

@@ -20,7 +20,6 @@ import * as trendSnapshotsRepo from "../../repos/trendSnapshots";
 import { fetchRecentSystemEvents, logSystemEvent } from "../../repos/systemEvents";
 import {
   EditorAgentInputSchema,
-  EditorRequestSchema,
   PublishRequestSchema,
   ScriptwriterAgentInputSchema,
   type PublishRequest,
@@ -28,6 +27,7 @@ import {
 import {
   AgentNameSchema,
   AgentRunRequestSchema,
+  EditorRenderRequestSchema,
   PublisherPublishRequestSchema,
   ScriptwriterGenerateRequestSchema,
   type AgentName,
@@ -133,6 +133,8 @@ const logLifecycleEvent = async (
   logSystemEvent({
     agent_name: agentName,
     event_type: eventType,
+    workflow_id: context.workflow_id ?? null,
+    correlation_id: context.correlation_id ?? null,
     payload: attachContext(payload, context),
     created_at: nowIso(),
   });
@@ -259,6 +261,17 @@ export const generateScriptFromApi = async (rawBody: unknown) => {
 
   await logLifecycleEvent(
     "ScriptwriterAgent",
+    "agent.run.start",
+    {
+      product_id: parsedBody.product_id,
+      creative_pattern_id: parsedBody.creative_pattern_id,
+      trend_snapshot_id: parsedBody.trend_snapshot_id,
+    },
+    context,
+  );
+
+  await logLifecycleEvent(
+    "ScriptwriterAgent",
     "script.generate.start",
     {
       product_id: parsedBody.product_id,
@@ -292,12 +305,19 @@ export const generateScriptFromApi = async (rawBody: unknown) => {
       { product_id: script.product_id, script_id: script.script_id },
       context,
     );
+    await logLifecycleEvent(
+      "ScriptwriterAgent",
+      "agent.run.success",
+      { product_id: script.product_id, script_id: script.script_id },
+      context,
+    );
 
     return {
       workflow_id: parsedBody.workflow_id ?? null,
       correlation_id: parsedBody.correlation_id ?? null,
       script_id: script.script_id,
       product_id: script.product_id,
+      title: script.title ?? "",
       script_text: script.script_text ?? "",
       hook: script.hook ?? "",
       creative_variables: script.creative_variables ?? null,
@@ -307,6 +327,17 @@ export const generateScriptFromApi = async (rawBody: unknown) => {
     await logLifecycleEvent(
       "ScriptwriterAgent",
       "script.generate.error",
+      {
+        product_id: parsedBody.product_id,
+        creative_pattern_id: parsedBody.creative_pattern_id,
+        trend_snapshot_id: parsedBody.trend_snapshot_id,
+        message: error instanceof Error ? error.message : String(error),
+      },
+      context,
+    );
+    await logLifecycleEvent(
+      "ScriptwriterAgent",
+      "agent.run.error",
       {
         product_id: parsedBody.product_id,
         creative_pattern_id: parsedBody.creative_pattern_id,
@@ -335,28 +366,42 @@ export const generateScriptFromApi = async (rawBody: unknown) => {
   }
 };
 
-const EditorAPIRequestSchema = EditorRequestSchema.extend({
-  workflow_id: z.string().uuid().optional(),
-  correlation_id: z.string().uuid().optional(),
-});
-
 export const renderAssetFromApi = async (rawBody: unknown) => {
+  let context: WorkflowContext | null = null;
+  let scriptId: string | null = null;
+
   try {
-    const parsedBody = EditorAPIRequestSchema.parse(rawBody ?? {});
+    const parsedBody = EditorRenderRequestSchema.parse(rawBody ?? {});
+    context = {
+      workflow_id: parsedBody.workflow_id,
+      correlation_id: parsedBody.correlation_id,
+    };
+    scriptId = parsedBody.script_id;
 
     // Note: Validation of script/template existence is handled by EditorAgent v2.
     // The handler delegates all business logic to the agent.
 
     // Pass the full input including workflow context to the agent
     // EditorAgent v2 uses EditorRequestSchema internally to parse specific fields
-    const agentInput = {
-      ...parsedBody,
-      // Ensure strictly typed fields required by EditorRequestSchema are present
-      scriptId: parsedBody.scriptId,
+    const agentInput: Record<string, unknown> = {
+      scriptId: parsedBody.script_id,
       composition: parsedBody.composition,
-      styleTemplateId: parsedBody.styleTemplateId,
-      renderBackend: parsedBody.renderBackend,
     };
+
+    if (parsedBody.style_template_id) {
+      agentInput.styleTemplateId = parsedBody.style_template_id;
+    }
+
+    if (parsedBody.render_backend) {
+      agentInput.renderBackend = parsedBody.render_backend;
+    }
+
+    await logLifecycleEvent(
+      "EditorAgent",
+      "agent.run.start",
+      { script_id: parsedBody.script_id },
+      context,
+    );
 
     // Execute agent - this will emit agent.start, video.render.* events
     const result = (await new EditorAgent().execute(
@@ -365,7 +410,7 @@ export const renderAssetFromApi = async (rawBody: unknown) => {
 
     const { persistedAsset, storageUrl, asset } = result;
 
-    return {
+    const response = {
       asset_id: persistedAsset.asset_id,
       script_id: persistedAsset.script_id,
       storage_url: storageUrl,
@@ -378,7 +423,28 @@ export const renderAssetFromApi = async (rawBody: unknown) => {
       workflow_id: parsedBody.workflow_id ?? null,
       correlation_id: parsedBody.correlation_id ?? null,
     };
+
+    await logLifecycleEvent(
+      "EditorAgent",
+      "agent.run.success",
+      { script_id: response.script_id, asset_id: response.asset_id },
+      context,
+    );
+
+    return response;
   } catch (error) {
+    if (context) {
+      await logLifecycleEvent(
+        "EditorAgent",
+        "agent.run.error",
+        {
+          script_id: scriptId,
+          message: error instanceof Error ? error.message : String(error),
+        },
+        context,
+      );
+    }
+
     if (error instanceof z.ZodError) {
       throw new AgentApiError("Invalid request data", 400, error.errors);
     }
@@ -430,6 +496,13 @@ export const publishExperimentPostFromApi = async (rawBody: unknown) => {
 
   await logLifecycleEvent(
     "PublisherAgent",
+    "agent.run.start",
+    { experiment_id: parsedBody.experiment_id, platform: parsedBody.platform },
+    context,
+  );
+
+  await logLifecycleEvent(
+    "PublisherAgent",
     "publish.start",
     { experiment_id: parsedBody.experiment_id, platform: parsedBody.platform },
     context,
@@ -475,6 +548,16 @@ export const publishExperimentPostFromApi = async (rawBody: unknown) => {
       },
       context,
     );
+    await logLifecycleEvent(
+      "PublisherAgent",
+      "agent.run.success",
+      {
+        experiment_id: parsedBody.experiment_id,
+        platform: parsedBody.platform,
+        post_id: post.post_id,
+      },
+      context,
+    );
 
     return {
       workflow_id: parsedBody.workflow_id ?? null,
@@ -489,6 +572,16 @@ export const publishExperimentPostFromApi = async (rawBody: unknown) => {
     await logLifecycleEvent(
       "PublisherAgent",
       "publish.error",
+      {
+        experiment_id: parsedBody.experiment_id,
+        platform: parsedBody.platform,
+        message: error instanceof Error ? error.message : String(error),
+      },
+      context,
+    );
+    await logLifecycleEvent(
+      "PublisherAgent",
+      "agent.run.error",
       {
         experiment_id: parsedBody.experiment_id,
         platform: parsedBody.platform,

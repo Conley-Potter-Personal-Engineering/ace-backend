@@ -2,6 +2,7 @@ export * as agentNotesRepo from "./agentNotes";
 export * as creativePatternsRepo from "./creativePatterns";
 export * as embeddingsRepo from "./embeddings";
 export * as experimentsRepo from "./experiments";
+export * as metricsSummaryRepo from "./metricsSummary";
 export * as performanceMetricsRepo from "./performanceMetrics";
 export * as productsRepo from "./products";
 export * as publishedPostsRepo from "./publishedPosts";
