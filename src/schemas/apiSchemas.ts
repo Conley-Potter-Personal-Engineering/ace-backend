@@ -64,12 +64,24 @@ export const ScriptwriterGenerateRequestSchema = z
 
 const EditorRenderSnakeSchema = WorkflowContextSchema.extend({
   script_id: z.string().uuid("script_id must be a valid UUID"),
-  override_storage_path: z.string().trim().min(1).optional(),
+  composition: z.object({
+    duration: z.number().positive("Duration must be positive"),
+    tone: z.string().trim().min(1, "Tone is required"),
+    layout: z.string().trim().min(1, "Layout is required"),
+  }),
+  style_template_id: z.string().trim().min(1).optional(),
+  render_backend: z.enum(["local", "s3", "supabase"]).optional(),
 });
 
 const EditorRenderCamelSchema = WorkflowContextCamelSchema.extend({
   scriptId: z.string().uuid("scriptId must be a valid UUID"),
-  overrideStoragePath: z.string().trim().min(1).optional(),
+  composition: z.object({
+    duration: z.number().positive("Duration must be positive"),
+    tone: z.string().trim().min(1, "Tone is required"),
+    layout: z.string().trim().min(1, "Layout is required"),
+  }),
+  styleTemplateId: z.string().trim().min(1).optional(),
+  renderBackend: z.enum(["local", "s3", "supabase"]).optional(),
 });
 
 export const EditorRenderRequestSchema = z
@@ -78,15 +90,17 @@ export const EditorRenderRequestSchema = z
     const snake = value as z.infer<typeof EditorRenderSnakeSchema>;
     const camel = value as z.infer<typeof EditorRenderCamelSchema>;
     const scriptId = "script_id" in value ? snake.script_id : camel.scriptId;
-    const overrideStoragePath =
-      "override_storage_path" in value
-        ? snake.override_storage_path
-        : camel.overrideStoragePath ?? undefined;
+    const styleTemplateId =
+      "style_template_id" in value ? snake.style_template_id : camel.styleTemplateId ?? undefined;
+    const renderBackend =
+      "render_backend" in value ? snake.render_backend : camel.renderBackend ?? undefined;
 
     return {
       ...normalizeWorkflowContext(value),
       script_id: scriptId,
-      override_storage_path: overrideStoragePath,
+      composition: value.composition,
+      style_template_id: styleTemplateId,
+      render_backend: renderBackend,
     };
   });
 
@@ -224,8 +238,13 @@ export const PerformanceMetricsQuerySchema = z
     },
   );
 
+export const MetricsSummaryQuerySchema = z.object({
+  period: z.enum(["today", "week", "month"]).default("today"),
+});
+
 export const ExperimentIdParamSchema = z.string().uuid("id must be a valid UUID");
 export const SystemEventIdParamSchema = z.string().uuid("id must be a valid UUID");
+export const PostIdParamSchema = z.string().uuid("id must be a valid UUID");
 
 export const ScriptsListQuerySchema = PaginationQuerySchema.extend({
   product_id: z.string().uuid("product_id must be a valid UUID").optional(),

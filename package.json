@@ -9,7 +9,7 @@
 		"build:server": "tsup src/server.ts --out-dir dist --format cjs",
 		"build": "npm run build:next && npm run build:server",
 		"start": "node dist/server.cjs",
-		"generate:types": "supabase gen types typescript --project-id \"oajnnlxvuxonysmfqrxr\" > src/db/types.ts",
+		"generate:types": "npx supabase gen types typescript --project-id \"oajnnlxvuxonysmfqrxr\" > src/db/types.ts",
 		"lint": "eslint .",
 		"typecheck": "tsc --noEmit",
 		"typecheck:all": "tsc --project tsconfig.test.json",

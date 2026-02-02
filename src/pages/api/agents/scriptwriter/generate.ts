@@ -9,8 +9,9 @@ import {
   AgentApiError,
   generateScriptFromApi,
 } from "../../../../api/handlers/agentsHandler";
-import { withAuth } from "@/lib/api/middleware/auth";
 import { respondWithError } from "@/lib/api/middleware/errorHandler";
+import { withApiKeyAuth } from "@/lib/api/middleware/apiKeyAuth";
+import { withWorkflowContextFromHeaders } from "@/lib/api/utils/requestContext";
 
 async function handler(
   req: ApiRequest,
@@ -21,8 +22,14 @@ async function handler(
   }
 
   try {
-    const data = await generateScriptFromApi(req.body ?? {});
-    return ok(res, { success: true, data });
+    const payload = withWorkflowContextFromHeaders(req, req.body ?? {});
+    const data = await generateScriptFromApi(payload);
+    return ok(res, {
+      success: true,
+      data,
+      message: "Script generated successfully",
+      error: null,
+    });
   } catch (error) {
     if (error instanceof AgentApiError) {
       if (error.status === 400) {
@@ -42,4 +49,4 @@ async function handler(
   }
 }
 
-export default withAuth(handler);
+export default withApiKeyAuth(handler);

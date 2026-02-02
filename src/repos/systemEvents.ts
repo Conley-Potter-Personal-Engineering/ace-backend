@@ -1,6 +1,7 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { getSupabase } from "../db/db";
 import type { Database, Tables, TablesInsert, TablesUpdate } from "../db/types";
+import type { SystemEventCreateInput } from "../schemas/systemEventsSchema";
 import { identifierSchema, jsonSchema, nullableDateSchema, z } from "./validators";
 
 const eventCategorySchema = z.enum([
@@ -53,6 +54,22 @@ export const logSystemEvent = async (
   }
 
   return data;
+};
+
+export const createSystemEvent = async (event: SystemEventCreateInput) => {
+  const payload = event.metadata ?? null;
+
+  return logSystemEvent({
+    agent_name: event.agent_name ?? null,
+    correlation_id: event.correlation_id ?? null,
+    workflow_id: event.workflow_id ?? null,
+    event_type: event.event_type,
+    event_category: event.event_category,
+    severity: event.severity,
+    message: event.message,
+    metadata: event.metadata ?? null,
+    payload,
+  });
 };
 
 export const listSystemEvents = async () => {

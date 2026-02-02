@@ -97,6 +97,18 @@ describe("ScriptwriterAgent", () => {
       product_id: baseInput.productId,
       name: "Test Product",
       description: "A compelling product description.",
+      brand: "TestBrand",
+      category: "testing",
+      price_usd: 29.99,
+      currency: "USD",
+      target_audience: "Health-conscious adults",
+      primary_benefit: "Saves time",
+      content_brief: "Focus on convenience angle",
+      status: "active",
+      key_features: ["feature1", "feature2"],
+      objections: ["objection1"],
+      demo_ideas: ["demo1"],
+      meta: { compliance: ["No medical claims"] },
     } as any);
 
     vi.mocked(creativePatternsRepo.getCreativePatternById).mockResolvedValue(

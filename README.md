@@ -59,12 +59,6 @@ src/
     ... Zod schemas for input validation ...
   workflows/
     ... workflow runners (future) ...
-architecture/
-  overview.md
-  schema.md
-  events.md
-  agents/
-  workflows/
 README.md
 ```
 
@@ -88,8 +82,6 @@ ACE is powered by a relational schema in Supabase that includes:
 • system events  
 
 These tables give ACE the ability to study trends, generate content, publish experiments, measure results, and evolve over time.
-
-A complete schema description lives in `architecture/schema.md`.
 
 ## System Events
 

@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { Tables } from "@/db/types";
-import type { ExperimentWithProduct } from "@/lib/api/repositories/performanceMetricsRepository";
+import type { ExperimentWithProduct } from "@/repos/performanceMetrics";
 import {
   calculateEngagement,
   calculatePerformanceScore,

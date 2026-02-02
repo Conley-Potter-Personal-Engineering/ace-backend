@@ -1,5 +1,5 @@
 import { randomUUID } from "crypto";
-import { afterAll, beforeAll, describe, expect, it } from "vitest";
+import { afterAll, beforeAll, describe, expect, it, vi, beforeEach, afterEach } from "vitest";
 import { integrationEnv } from "../setup";
 import handler from "@/pages/api/performance-metrics";
 import { getPerformanceMetricsApi } from "@/api/handlers/performanceMetricsHandler";
@@ -32,12 +32,23 @@ const createMockResponse = () => {
 };
 
 describe("GET /api/performance-metrics (auth + validation)", () => {
+  let errorSpy: ReturnType<typeof vi.spyOn>;
+
+  beforeEach(() => {
+    errorSpy = vi.spyOn(console, "error").mockImplementation(() => {});
+  });
+
+  afterEach(() => {
+    errorSpy.mockRestore();
+  });
+
   it("returns 401 when API key is missing", async () => {
     const { res, getStatus, getBody } = createMockResponse();
     await handler({ method: "GET", headers: {} }, res as any);
 
     expect(getStatus()).toBe(401);
     expect(getBody()?.error?.code).toBe("UNAUTHORIZED");
+    expect(errorSpy).not.toHaveBeenCalled();
   });
 
   it("returns 400 for missing required parameters", async () => {
@@ -55,6 +66,8 @@ describe("GET /api/performance-metrics (auth + validation)", () => {
 
     expect(getStatus()).toBe(400);
     expect(getBody()?.error?.code).toBe("VALIDATION_ERROR");
+    expect(getBody()?.error?.details?.start_date?._errors?.length).toBeGreaterThan(0);
+    expect(errorSpy).not.toHaveBeenCalled();
   });
 
   it("returns 400 for invalid platform", async () => {
@@ -76,6 +89,8 @@ describe("GET /api/performance-metrics (auth + validation)", () => {
 
     expect(getStatus()).toBe(400);
     expect(getBody()?.error?.code).toBe("VALIDATION_ERROR");
+    expect(getBody()?.error?.details?.platform?._errors?.length).toBeGreaterThan(0);
+    expect(errorSpy).not.toHaveBeenCalled();
   });
 
   it("returns 400 for invalid UUID", async () => {
@@ -97,6 +112,8 @@ describe("GET /api/performance-metrics (auth + validation)", () => {
 
     expect(getStatus()).toBe(400);
     expect(getBody()?.error?.code).toBe("VALIDATION_ERROR");
+    expect(getBody()?.error?.details?.experiment_id?._errors?.length).toBeGreaterThan(0);
+    expect(errorSpy).not.toHaveBeenCalled();
   });
 
   it("returns 400 for invalid granularity", async () => {
@@ -118,6 +135,8 @@ describe("GET /api/performance-metrics (auth + validation)", () => {
 
     expect(getStatus()).toBe(400);
     expect(getBody()?.error?.code).toBe("VALIDATION_ERROR");
+    expect(getBody()?.error?.details?.granularity?._errors?.length).toBeGreaterThan(0);
+    expect(errorSpy).not.toHaveBeenCalled();
   });
 
   it("returns 400 when end_date is before start_date", async () => {
@@ -138,6 +157,8 @@ describe("GET /api/performance-metrics (auth + validation)", () => {
 
     expect(getStatus()).toBe(400);
     expect(getBody()?.error?.code).toBe("VALIDATION_ERROR");
+    expect(getBody()?.error?.details?.end_date?._errors?.length).toBeGreaterThan(0);
+    expect(errorSpy).not.toHaveBeenCalled();
   });
 });
 
@@ -168,14 +189,40 @@ describeIf("GET /api/performance-metrics (integration)", () => {
       product_id: ids.productA,
       name: "Product Alpha",
       source_platform: "tiktok",
+      category: "testing",
+      brand: "TestBrand",
+      price_usd: 19.99,
+      currency: "USD",
+      target_audience: "Creators",
+      primary_benefit: "Saves time",
+      content_brief: "Focus on speed and ease of use",
+      status: "active",
+      key_features: ["feature1"],
+      objections: ["objection1"],
+      demo_ideas: ["demo1"],
+      meta: { compliance: ["No medical claims"] },
       created_at: new Date().toISOString(),
+      updated_at: new Date().toISOString(),
     });
 
     await createProduct({
       product_id: ids.productB,
       name: "Product Beta",
       source_platform: "youtube",
+      category: "testing",
+      brand: "TestBrand",
+      price_usd: 24.99,
+      currency: "USD",
+      target_audience: "Marketers",
+      primary_benefit: "Improves conversions",
+      content_brief: "Emphasize results and ROI",
+      status: "active",
+      key_features: ["feature2"],
+      objections: ["objection2"],
+      demo_ideas: ["demo2"],
+      meta: { compliance: ["No medical claims"] },
       created_at: new Date().toISOString(),
+      updated_at: new Date().toISOString(),
     });
 
     await createExperiment({

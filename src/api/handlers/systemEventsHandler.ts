@@ -1,11 +1,10 @@
-import { getSupabase } from "@/db/supabase";
 import {
   createSystemEvent,
   getSystemEventById,
-  getSystemEventsByCorrelationId,
-  getSystemEventsByWorkflowId,
-  getSystemEvents,
-} from "@/lib/api/repositories/systemEventsRepository";
+  listSystemEventsByCorrelationId,
+  listSystemEventsByWorkflowId,
+  querySystemEvents,
+} from "@/repos/systemEvents";
 import { buildPagination } from "@/lib/api/utils/pagination";
 import {
   SystemEventIdParamSchema,
@@ -19,7 +18,7 @@ export const listSystemEventsApi = async (
   const parsed = SystemEventsQuerySchema.parse(rawQuery);
   const limit = parsed.limit ?? 100;
   const offset = parsed.offset ?? 0;
-  const { events, total } = await getSystemEvents(getSupabase(), {
+  const { events, total } = await querySystemEvents({
     severity: parsed.severity,
     agent_name: parsed.agent_name,
     event_type: parsed.event_type,
@@ -54,7 +53,7 @@ export const listSystemEventsApi = async (
 
 export const createSystemEventApi = async (rawBody: unknown) => {
   const event = SystemEventCreateSchema.parse(rawBody ?? {});
-  const created = await createSystemEvent(getSupabase(), event);
+  const created = await createSystemEvent(event);
 
   return {
     id: created.event_id,
@@ -82,8 +81,7 @@ const toEventSummary = (event: {
 
 export const getSystemEventDetailApi = async (eventId: string) => {
   const validatedId = SystemEventIdParamSchema.parse(eventId);
-  const supabase = getSupabase();
-  const event = await getSystemEventById(supabase, validatedId);
+  const event = await getSystemEventById(validatedId);
 
   if (!event) {
     return null;
@@ -91,15 +89,13 @@ export const getSystemEventDetailApi = async (eventId: string) => {
 
   let relatedEvents: Array<ReturnType<typeof toEventSummary>> = [];
   if (event.correlation_id) {
-    const related = await getSystemEventsByCorrelationId(
-      supabase,
+    const related = await listSystemEventsByCorrelationId(
       event.correlation_id,
       { excludeEventId: event.event_id, limit: MAX_RELATED_EVENTS },
     );
     relatedEvents = related.map(toEventSummary);
   } else if (event.workflow_id) {
-    const related = await getSystemEventsByWorkflowId(
-      supabase,
+    const related = await listSystemEventsByWorkflowId(
       event.workflow_id,
       { excludeEventId: event.event_id, limit: MAX_RELATED_EVENTS },
     );

@@ -1,17 +1,17 @@
 import type { Tables } from "@/db/types";
-import { getSupabase } from "@/db/supabase";
 import {
   getExperimentsWithProductsByPostIds,
   getMetricsByPostsAndDateRange,
+  getPostMetrics,
   getPostsByFilters,
-} from "@/lib/api/repositories/performanceMetricsRepository";
+} from "@/repos/performanceMetrics";
 import {
   calculateEngagement,
   groupMetricsByTimeBucket,
   rankExperimentsByScore,
   type Granularity,
 } from "@/lib/api/utils/metricsAggregation";
-import { PerformanceMetricsQuerySchema } from "@/schemas/apiSchemas";
+import { PerformanceMetricsQuerySchema, PostIdParamSchema } from "@/schemas/apiSchemas";
 
 interface SummaryTotals {
   total_views: number;
@@ -126,16 +126,16 @@ export const getPerformanceMetricsApi = async (
   const granularity = parsed.granularity as Granularity;
 
   // TODO: Add Redis caching (2-5 minute TTL) keyed by query params.
-  const supabase = getSupabase();
-  const posts = await getPostsByFilters(supabase, {
+  const posts = await getPostsByFilters({
     platform: platformFilter === "all" ? undefined : platformFilter,
     experiment_id: parsed.experiment_id,
     product_id: parsed.product_id,
+    start_date: parsed.start_date,
+    end_date: parsed.end_date,
   });
 
   const postIds = posts.map((post) => post.post_id);
   const metrics = await getMetricsByPostsAndDateRange(
-    supabase,
     postIds,
     parsed.start_date,
     parsed.end_date,
@@ -157,7 +157,7 @@ export const getPerformanceMetricsApi = async (
 
   const topExperiments = metrics.length
     ? rankExperimentsByScore(
-        await getExperimentsWithProductsByPostIds(supabase, postIds),
+        await getExperimentsWithProductsByPostIds(postIds),
         metrics,
       )
     : [];
@@ -167,4 +167,9 @@ export const getPerformanceMetricsApi = async (
     time_series: timeSeriesWithPlatform,
     top_experiments: topExperiments,
   };
+};
+
+export const getPostPerformanceMetricsApi = async (postId: string) => {
+  const validatedId = PostIdParamSchema.parse(postId);
+  return getPostMetrics(validatedId);
 };

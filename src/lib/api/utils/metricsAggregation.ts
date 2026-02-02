@@ -1,5 +1,5 @@
 import type { Tables } from "@/db/types";
-import type { ExperimentWithProduct } from "@/lib/api/repositories/performanceMetricsRepository";
+import type { ExperimentWithProduct } from "@/repos/performanceMetrics";
 
 export type PerformanceMetric = Tables<"performance_metrics">;
 export type Granularity = "hour" | "day" | "week";

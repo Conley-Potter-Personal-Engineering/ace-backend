@@ -64,6 +64,8 @@ export const handleApiError = (
   error: unknown,
   context: string,
 ) => {
+  const suppressValidationLogs = process.env.NODE_ENV === "test";
+
   if (error instanceof ApiError) {
     return respondWithError(res, {
       code: error.code,
@@ -73,7 +75,9 @@ export const handleApiError = (
   }
 
   if (error instanceof ZodError) {
-    console.error(`[api] validation error during ${context}`, error.format());
+    if (!suppressValidationLogs) {
+      console.error(`[api] validation error during ${context}`, error.format());
+    }
     return respondWithError(res, {
       code: "VALIDATION_ERROR",
       message: `Invalid ${context} payload`,
