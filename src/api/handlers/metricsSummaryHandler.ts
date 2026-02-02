@@ -143,11 +143,9 @@ const averagePerformanceScore = (metrics: Tables<"performance_metrics">[]) => {
 const getWorkflowEventType = (event: Tables<"system_events">) =>
   (event.event_type ?? "").toLowerCase();
 
-const isWorkflowStart = (eventType: string) =>
-  eventType.includes("workflow") && eventType.includes("start");
+const isWorkflowStart = (eventType: string) => eventType === "workflow.start";
 
-const isWorkflowEnd = (eventType: string) =>
-  eventType.includes("workflow") && (eventType.includes("success") || eventType.includes("error"));
+const isWorkflowEnd = (eventType: string) => eventType === "workflow.end";
 
 const calculateActiveWorkflows = (events: Tables<"system_events">[]) => {
   const started = new Set<string>();
