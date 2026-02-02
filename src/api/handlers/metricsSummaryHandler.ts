@@ -1,7 +1,7 @@
 import type { Tables } from "@/db/types";
 import {
   fetchPerformanceMetricsBetween,
-  fetchPublishedPostsCreatedBetween,
+  fetchPublishedPostsPostedBetween,
   fetchScriptsCreatedBetween,
   fetchSystemEvents,
   fetchVideoAssetsCreatedBetween,
@@ -213,8 +213,8 @@ export const getMetricsSummary = async (
     fetchScriptsCreatedBetween(toIso(previousPeriod.start), toIso(previousPeriod.end)),
     fetchVideoAssetsCreatedBetween(toIso(currentPeriod.start), toIso(currentPeriod.end)),
     fetchVideoAssetsCreatedBetween(toIso(previousPeriod.start), toIso(previousPeriod.end)),
-    fetchPublishedPostsCreatedBetween(toIso(currentPeriod.start), toIso(currentPeriod.end)),
-    fetchPublishedPostsCreatedBetween(toIso(previousPeriod.start), toIso(previousPeriod.end)),
+    fetchPublishedPostsPostedBetween(toIso(currentPeriod.start), toIso(currentPeriod.end)),
+    fetchPublishedPostsPostedBetween(toIso(previousPeriod.start), toIso(previousPeriod.end)),
     fetchPerformanceMetricsBetween(toIso(currentPeriod.start), toIso(currentPeriod.end)),
     fetchPerformanceMetricsBetween(toIso(previousPeriod.start), toIso(previousPeriod.end)),
   ]);

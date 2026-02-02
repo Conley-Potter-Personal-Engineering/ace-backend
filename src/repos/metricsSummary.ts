@@ -45,6 +45,29 @@ export const fetchPublishedPostsCreatedBetween = async (
 ): Promise<Tables<"published_posts">[]> =>
   fetchRange<Tables<"published_posts">>("published_posts", startDate, endDate, supabase);
 
+export const fetchPublishedPostsPostedBetween = async (
+  startDate: string,
+  endDate: string,
+  supabase: SupabaseClient<Database> = getSupabase(),
+): Promise<Tables<"published_posts">[]> => {
+  const baseQuery = supabase.from("published_posts");
+  const query = baseQuery.select("*") ?? baseQuery;
+  query.gte?.("posted_at", startDate);
+  query.lte?.("posted_at", endDate);
+  const response = (query.returns
+    ? await query.returns<Tables<"published_posts">[]>()
+    : await query) as
+    | { data: Tables<"published_posts">[] | null; error: { message: string } | null }
+    | undefined;
+  const { data, error } = response ?? { data: null, error: null };
+
+  if (error) {
+    throw new Error(`Failed to fetch published posts: ${error.message}`);
+  }
+
+  return data ?? [];
+};
+
 export const fetchPerformanceMetricsBetween = async (
   startDate: string,
   endDate: string,
