@@ -25,31 +25,34 @@ const readApiKey = (req: ApiRequest) =>
  */
 export const withApiKeyAuth = <T = unknown>(
   handler: ApiKeyHandler<T>,
-): ((req: ApiRequest, res: ApiResponseLike<T>) => Promise<unknown>) =>
+): ((req: ApiRequest, res: ApiResponseLike<T>) => Promise<void>) =>
   async (req, res) => {
     const apiKey = readApiKey(req);
 
     if (!apiKey) {
-      return respondWithError(res, {
+      respondWithError(res, {
         code: "UNAUTHORIZED",
         message: "API key required",
       });
+      return;
     }
 
     const expected = process.env.ACE_API_KEY;
     if (!expected) {
-      return respondWithError(res, {
+      respondWithError(res, {
         code: "INTERNAL_ERROR",
         message: "API key is not configured",
       });
+      return;
     }
 
     if (apiKey !== expected) {
-      return respondWithError(res, {
+      respondWithError(res, {
         code: "UNAUTHORIZED",
         message: "Invalid API key",
       });
+      return;
     }
 
-    return handler(req, res);
+    await handler(req, res);
   };

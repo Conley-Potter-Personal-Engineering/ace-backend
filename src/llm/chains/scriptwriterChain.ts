@@ -21,12 +21,30 @@ export interface ScriptwriterChainOptions {
   temperature?: number;
   reasoningEffort?: "low" | "medium" | "high";
   maxTokens?: number;
+  timeoutMs?: number;
 }
+
+const DEFAULT_SCRIPTWRITER_MODEL = "gpt-5";
+const DEFAULT_SCRIPTWRITER_FALLBACK_MODEL = "gpt-4.1-mini";
+const DEFAULT_MAX_COMPLETION_TOKENS = 3200;
+const DEFAULT_FALLBACK_MAX_TOKENS = 1400;
+const DEFAULT_TIMEOUT_MS = 45000;
+const DEFAULT_REASONING_EFFORT: "low" | "medium" | "high" = "low";
+
+const isReasoningModelName = (modelName: string): boolean => {
+  const normalizedModel = modelName.toLowerCase();
+  return (
+    normalizedModel.startsWith("o1") ||
+    normalizedModel.startsWith("o3") ||
+    normalizedModel.includes("gpt-5")
+  );
+};
 
 export class ScriptwriterChainError extends Error {
   code:
     | "INPUT_VALIDATION"
     | "MODEL_INVOCATION"
+    | "OUTPUT_TRUNCATED"
     | "FALLBACK_FAILED";
   cause?: unknown;
 
@@ -41,6 +59,29 @@ export class ScriptwriterChainError extends Error {
     this.cause = cause;
   }
 }
+
+const toErrorMessage = (error: unknown): string =>
+  error instanceof Error ? error.message : String(error);
+
+const parsePositiveIntEnv = (
+  value: string | undefined,
+  fallback: number,
+): number => {
+  const parsed = Number.parseInt(value ?? "", 10);
+  return Number.isInteger(parsed) && parsed > 0 ? parsed : fallback;
+};
+
+const parseReasoningEffort = (
+  value: string | undefined,
+): "low" | "medium" | "high" | undefined => {
+  if (value === "low" || value === "medium" || value === "high") {
+    return value;
+  }
+  return undefined;
+};
+
+const isTimeoutError = (error: unknown): boolean =>
+  /timed out|timeout|etimedout|request timed out/i.test(toErrorMessage(error));
 
 const hasOpenAICredentials = (): boolean =>
   Boolean(
@@ -63,23 +104,50 @@ class StaticResponseChatModel {
 const buildModelConfig = (
   options: ScriptwriterChainOptions,
 ): Record<string, unknown> => {
+  const envMaxCompletionTokens = parsePositiveIntEnv(
+    process.env.SCRIPTWRITER_MAX_COMPLETION_TOKENS,
+    DEFAULT_MAX_COMPLETION_TOKENS,
+  );
+  const envReasoningEffort =
+    parseReasoningEffort(process.env.SCRIPTWRITER_REASONING_EFFORT) ??
+    DEFAULT_REASONING_EFFORT;
+  const envTimeoutMs = parsePositiveIntEnv(
+    process.env.SCRIPTWRITER_TIMEOUT_MS,
+    DEFAULT_TIMEOUT_MS,
+  );
+
   const {
-    model = process.env.SCRIPTWRITER_MODEL ?? "gpt-5",
+    model = process.env.SCRIPTWRITER_MODEL ?? DEFAULT_SCRIPTWRITER_MODEL,
     temperature = 0.7,
-    reasoningEffort,
-    maxTokens = 1500,
+    reasoningEffort = envReasoningEffort,
+    maxTokens = envMaxCompletionTokens,
+    timeoutMs = envTimeoutMs,
   } = options;
 
+  const isReasoningModel = isReasoningModelName(model);
+
   const baseConfig: Record<string, unknown> = {
+    model,
     modelName: model,
-    maxTokens,
+    // Handle retries explicitly in scriptwriterChain to avoid duplicate hidden
+    // retries that inflate latency and obscure observability.
+    maxRetries: 0,
+    timeout: timeoutMs,
   };
 
-  if (model.startsWith("o1") || model.startsWith("o3")) {
+  if (isReasoningModel) {
+    // Prevent ChatOpenAI from sending max_tokens to models that only accept
+    // max_completion_tokens.
+    baseConfig.maxTokens = -1;
+    baseConfig.modelKwargs = {
+      max_completion_tokens: maxTokens,
+    };
+
     if (reasoningEffort) {
       baseConfig.reasoning_effort = reasoningEffort;
     }
   } else {
+    baseConfig.maxTokens = maxTokens;
     baseConfig.temperature = temperature;
   }
 
@@ -116,19 +184,37 @@ const createScriptwriterModel = (
   return new ChatOpenAI(buildModelConfig(options));
 };
 
-const extractContent = (modelResponse: unknown): string => {
+const extractContent = (modelResponse: unknown, requestedModel: string): string => {
   if (typeof modelResponse === "string") {
-    return modelResponse;
+    const trimmed = modelResponse.trim();
+    if (!trimmed) {
+      throw new ScriptwriterChainError(
+        `Model returned empty content (finish_reason=unknown, model=${requestedModel}).`,
+        "MODEL_INVOCATION",
+      );
+    }
+    return trimmed;
   }
 
   const content = (modelResponse as { content?: unknown })?.content;
+  const metadata = (modelResponse as { response_metadata?: Record<string, unknown> })
+    ?.response_metadata;
+  const finishReason = String(metadata?.finish_reason ?? "unknown");
+  const modelName = String(metadata?.model_name ?? requestedModel);
 
   if (typeof content === "string") {
-    return content;
+    const trimmed = content.trim();
+    if (!trimmed) {
+      throw new ScriptwriterChainError(
+        `Model returned empty content (finish_reason=${finishReason}, model=${modelName}).`,
+        finishReason === "length" ? "OUTPUT_TRUNCATED" : "MODEL_INVOCATION",
+      );
+    }
+    return trimmed;
   }
 
   if (Array.isArray(content)) {
-    return content
+    const joined = content
       .map((part) => {
         if (typeof part === "string") {
           return part;
@@ -142,6 +228,15 @@ const extractContent = (modelResponse: unknown): string => {
       })
       .join("")
       .trim();
+
+    if (!joined) {
+      throw new ScriptwriterChainError(
+        `Model returned empty content blocks (finish_reason=${finishReason}, model=${modelName}).`,
+        finishReason === "length" ? "OUTPUT_TRUNCATED" : "MODEL_INVOCATION",
+      );
+    }
+
+    return joined;
   }
 
   throw new ScriptwriterChainError(
@@ -170,6 +265,37 @@ const normalizeToScriptOutput = (
     body: parsed.script_text,
   });
 
+const isRetryable = (error: unknown): boolean => {
+  if (error instanceof ScriptwriterParserError) {
+    return true;
+  }
+
+  if (error instanceof z.ZodError) {
+    return true;
+  }
+
+  if (isTimeoutError(error)) {
+    return true;
+  }
+
+  return error instanceof ScriptwriterChainError && error.code === "OUTPUT_TRUNCATED";
+};
+
+const runAttempt = async ({
+  llm,
+  prompt,
+  model,
+}: {
+  llm: ChatOpenAI;
+  prompt: string;
+  model: string;
+}): Promise<ScriptOutputType> => {
+  const response = await llm.invoke(prompt);
+  const content = extractContent(response, model);
+  const parsed = parseScriptwriterOutput(content);
+  return normalizeToScriptOutput(parsed);
+};
+
 export async function scriptwriterChain(
   rawInput: ScriptwriterChainInput,
   options: ScriptwriterChainOptions = {},
@@ -185,36 +311,69 @@ export async function scriptwriterChain(
     );
   }
 
+  const selectedModel = options.model ?? process.env.SCRIPTWRITER_MODEL ?? DEFAULT_SCRIPTWRITER_MODEL;
+  const fallbackModel =
+    process.env.SCRIPTWRITER_FALLBACK_MODEL ?? DEFAULT_SCRIPTWRITER_FALLBACK_MODEL;
+  const fallbackMaxTokens = parsePositiveIntEnv(
+    process.env.SCRIPTWRITER_FALLBACK_MAX_TOKENS,
+    DEFAULT_FALLBACK_MAX_TOKENS,
+  );
   const prompt = buildScriptwriterPrompt(validatedInput);
-  const llm = createScriptwriterModel(options);
+  const llm = createScriptwriterModel({
+    ...options,
+    model: selectedModel,
+  });
+
+  let primaryError: unknown;
+  try {
+    return await runAttempt({
+      llm,
+      prompt,
+      model: selectedModel,
+    });
+  } catch (error) {
+    primaryError = error;
+  }
+
+  if (!isRetryable(primaryError)) {
+    throw new ScriptwriterChainError(
+      `Scriptwriter model invocation failed on ${selectedModel}: ${toErrorMessage(
+        primaryError,
+      )}`,
+      "MODEL_INVOCATION",
+      primaryError,
+    );
+  }
+
+  const secondaryModel =
+    fallbackModel && fallbackModel !== selectedModel
+      ? fallbackModel
+      : selectedModel;
+  const fallbackPrompt = buildFallbackPrompt(validatedInput);
+  const fallbackLlm = createScriptwriterModel({
+    ...options,
+    model: secondaryModel,
+    maxTokens: fallbackMaxTokens,
+  });
 
   try {
-    const response = await llm.invoke(prompt);
-    const content = extractContent(response);
-    const parsed = parseScriptwriterOutput(content);
-    return normalizeToScriptOutput(parsed);
-  } catch {
-    const fallbackPrompt = buildFallbackPrompt(validatedInput);
-
-    try {
-      const fallbackResponse = await llm.invoke(fallbackPrompt);
-      const fallbackContent = extractContent(fallbackResponse);
-      const fallbackParsed = parseScriptwriterOutput(fallbackContent);
-      return normalizeToScriptOutput(fallbackParsed);
-    } catch (fallbackError) {
-      if (fallbackError instanceof ScriptwriterParserError) {
-        throw new ScriptwriterChainError(
-          "Scriptwriter chain fallback failed to parse output.",
-          "FALLBACK_FAILED",
-          fallbackError,
-        );
-      }
-
-      throw new ScriptwriterChainError(
-        "Scriptwriter chain fallback failed.",
-        "FALLBACK_FAILED",
+    return await runAttempt({
+      llm: fallbackLlm,
+      prompt: fallbackPrompt,
+      model: secondaryModel,
+    });
+  } catch (fallbackError) {
+    throw new ScriptwriterChainError(
+      `Scriptwriter attempts failed: primary model ${selectedModel} error: ${toErrorMessage(
+        primaryError,
+      )}; fallback model ${secondaryModel} error: ${toErrorMessage(
         fallbackError,
-      );
-    }
+      )}`,
+      "FALLBACK_FAILED",
+      {
+        primary: primaryError,
+        fallback: fallbackError,
+      },
+    );
   }
 }

@@ -149,6 +149,23 @@ When complete, you will be able to run a full cycle:
 
 Each step will produce system events and write state to the data backbone.
 
+## Scriptwriter Runtime Tuning
+
+The Scriptwriter endpoint (`POST /api/agents/scriptwriter/generate`) supports
+runtime tuning via environment variables:
+
+```
+SCRIPTWRITER_MODEL=gpt-5
+SCRIPTWRITER_FALLBACK_MODEL=gpt-4.1-mini
+SCRIPTWRITER_MAX_COMPLETION_TOKENS=3200
+SCRIPTWRITER_FALLBACK_MAX_TOKENS=1400
+SCRIPTWRITER_REASONING_EFFORT=low
+SCRIPTWRITER_TIMEOUT_MS=45000
+```
+
+These are useful when reasoning-model responses are truncated
+(`finish_reason=length`) and you want bounded retries with a backup model.
+
 ## Goals
 
 ACE aims to become a fully autonomous creative system capable of:

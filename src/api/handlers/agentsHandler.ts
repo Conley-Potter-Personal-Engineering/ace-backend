@@ -351,6 +351,7 @@ export const generateScriptFromApi = async (rawBody: unknown) => {
       throw error;
     }
 
+    const causeMessage = error instanceof Error ? error.message : String(error);
     throw new AgentApiError(
       "Failed to generate script",
       500,
@@ -359,6 +360,7 @@ export const generateScriptFromApi = async (rawBody: unknown) => {
           product_id: parsedBody.product_id,
           creative_pattern_id: parsedBody.creative_pattern_id,
           trend_snapshot_id: parsedBody.trend_snapshot_id,
+          cause_message: causeMessage,
         },
         context,
       ),

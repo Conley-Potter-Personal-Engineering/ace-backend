@@ -62,17 +62,18 @@ interface WithAuthOptions {
 export const withAuth = <T = unknown>(
   handler: AuthenticatedApiHandler<T>,
   options?: WithAuthOptions,
-): ((req: ApiRequest, res: ApiResponseLike<T>) => Promise<unknown>) =>
+): ((req: ApiRequest, res: ApiResponseLike<T>) => Promise<void>) =>
   async (req, res) => {
     const token = extractBearerToken(req.headers?.authorization);
     const allowApiKey = options?.allowApiKey === true;
 
     if (!token) {
       if (!allowApiKey) {
-        return respondWithError(res, {
+        respondWithError(res, {
           code: "UNAUTHORIZED",
           message: "Authentication required",
         });
+        return;
       }
     }
 
@@ -84,24 +85,27 @@ export const withAuth = <T = unknown>(
         if (!error && data.user) {
           const authedReq = req as AuthenticatedApiRequest;
           authedReq.user = data.user;
-          return handler(authedReq, res);
+          await handler(authedReq, res);
+          return;
         }
 
         if (!allowApiKey) {
-          return respondWithError(res, {
+          respondWithError(res, {
             code: "UNAUTHORIZED",
             message: "Invalid or expired token",
             details: error?.message,
           });
+          return;
         }
       } catch (error) {
         if (!allowApiKey) {
           const message = error instanceof Error ? error.message : String(error);
-          return respondWithError(res, {
+          respondWithError(res, {
             code: "INTERNAL_ERROR",
             message: "Failed to validate token",
             details: { message },
           });
+          return;
         }
       }
     }
@@ -111,9 +115,11 @@ export const withAuth = <T = unknown>(
       const expectedApiKey = process.env.ACE_API_KEY;
 
       if (apiKey && expectedApiKey && safeEqual(apiKey, expectedApiKey)) {
-        return handler(req as AuthenticatedApiRequest, res);
+        await handler(req as AuthenticatedApiRequest, res);
+        return;
       }
 
-      return respond(res as ApiResponseLike<typeof unauthorizedBody>, 401, unauthorizedBody);
+      respond(res as ApiResponseLike<typeof unauthorizedBody>, 401, unauthorizedBody);
+      return;
     }
   };
