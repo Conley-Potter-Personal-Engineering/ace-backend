@@ -161,13 +161,18 @@ describe("ScriptwriterAgent", () => {
 
     expect(scriptsRepo.createScript).toHaveBeenCalledWith({
       productId: baseInput.productId,
+      title: structuredScript.title,
       scriptText: expectedScriptText,
       hook: structuredScript.hook,
-      creativeVariables: expect.objectContaining({
+      cta: structuredScript.cta,
+      outline: "Setup\nPayoff",
+      creativeVariables: {
         emotion: "excited",
         structure: "Story arc",
         style: "casual",
-      }),
+        patternUsed: baseInput.creativePatternId,
+        trendReference: mockTrend.snapshot_id,
+      },
       creativePatternId: baseInput.creativePatternId,
       trendReference: mockTrend.snapshot_id,
       createdAt: fixedNow,

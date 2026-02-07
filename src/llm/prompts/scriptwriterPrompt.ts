@@ -49,8 +49,33 @@ const pushListSection = (
   sections.push("");
 };
 
-const formatMetaList = (items?: string[] | null): string[] =>
-  (items ?? []).map((item) => item.trim()).filter(Boolean);
+const formatMetaList = (items?: unknown): string[] => {
+  if (Array.isArray(items)) {
+    return items
+      .map((item) => (typeof item === "string" ? item : String(item ?? "")))
+      .map((item) => item.trim())
+      .filter(Boolean);
+  }
+
+  if (typeof items === "string") {
+    const trimmed = items.trim();
+    if (!trimmed) {
+      return [];
+    }
+
+    // Support legacy payloads where list fields were stored as CSV strings.
+    if (trimmed.includes(",")) {
+      return trimmed
+        .split(",")
+        .map((item) => item.trim())
+        .filter(Boolean);
+    }
+
+    return [trimmed];
+  }
+
+  return [];
+};
 
 const buildEntitySections = (
   input: ScriptwriterEntityInput,

@@ -223,21 +223,28 @@ export class ScriptwriterAgent extends BaseAgent {
       trendReference: trendReference?.snapshot_id ?? input.trendSnapshotId,
     });
 
-    await agentNotesRepo.createAgentNote({
-      agent_name: this.agentName,
-      topic: "script_generation",
-      content: [
-        `Script generated for ${product.name ?? product.product_id}.`,
-        `Pattern used: ${patternUsed?.pattern_id ?? "none"}; Trend reference: ${
-          trendReference?.snapshot_id ?? "none"
-        }.`,
-        `Creative variables: ${JSON.stringify(creativeVariables)}`,
-        `CTA: ${structuredScript.cta}`,
-      ].join("\n"),
-      importance: 0.6,
-      embedding: null,
-      created_at: this.now(),
-    });
+    try {
+      await agentNotesRepo.createAgentNote({
+        agent_name: this.agentName,
+        topic: "script_generation",
+        content: [
+          `Script generated for ${product.name ?? product.product_id}.`,
+          `Pattern used: ${patternUsed?.pattern_id ?? "none"}; Trend reference: ${
+            trendReference?.snapshot_id ?? "none"
+          }.`,
+          `Creative variables: ${JSON.stringify(creativeVariables)}`,
+          `CTA: ${structuredScript.cta}`,
+        ].join("\n"),
+        importance: 0.6,
+        embedding: null,
+        created_at: this.now(),
+      });
+    } catch (noteError) {
+      await this.logEvent("agent.note.error", {
+        message:
+          noteError instanceof Error ? noteError.message : String(noteError),
+      });
+    }
 
     return {
       result: createdScript,
@@ -303,8 +310,11 @@ export class ScriptwriterAgent extends BaseAgent {
     try {
       const createdScript = await scriptsRepo.createScript({
         productId,
+        title: structuredScript.title,
         scriptText: formatScriptText(structuredScript),
         hook: structuredScript.hook,
+        cta: structuredScript.cta,
+        outline: structuredScript.outline.join("\n"),
         creativeVariables,
         creativePatternId,
         trendReference,
