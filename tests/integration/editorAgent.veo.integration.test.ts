@@ -280,7 +280,6 @@ describe("EditorAgent VEO integration", () => {
 
     const eventTypes = getEventTypesForAgent(agentName);
     assertEventOrder(eventTypes, [
-      "agent.start",
       "video.render.start",
       "video.render.progress",
       "video.generate.start",
@@ -289,7 +288,6 @@ describe("EditorAgent VEO integration", () => {
       "video.assets.uploaded",
       "video.render.success",
       "video.assets.created",
-      "agent.success",
     ]);
   });
 
@@ -344,7 +342,7 @@ describe("EditorAgent VEO integration", () => {
     const eventTypes = getEventTypesForAgent(agentName);
     expect(eventTypes).toContain("video.generate.error");
     expect(eventTypes).toContain("video.render.error");
-    expect(eventTypes).toContain("agent.error");
+    expect(eventTypes).not.toContain("agent.error");
     expect(eventTypes).not.toContain("video.generate.success");
     expect(eventTypes).not.toContain("agent.success");
   });
@@ -366,7 +364,7 @@ describe("EditorAgent VEO integration", () => {
 
     const eventTypes = getEventTypesForAgent(agentName);
     expect(eventTypes).toContain("video.render.error");
-    expect(eventTypes).toContain("agent.error");
+    expect(eventTypes).not.toContain("agent.error");
     expect(eventTypes).not.toContain("video.generate.start");
     expect(eventTypes).not.toContain("video.generate.success");
     expect(eventTypes).not.toContain("agent.success");

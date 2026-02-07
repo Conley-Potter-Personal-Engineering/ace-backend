@@ -24,12 +24,54 @@ export interface EditorChainResult {
   metadata: EditorParserOutput["metadata"];
 }
 
-const editorModel = createEditorModel(0.35);
+export class EditorChainError extends Error {
+  code: "MODEL_INVOCATION" | "FALLBACK_FAILED";
+  cause?: unknown;
 
-const editorRunnable = RunnableSequence.from<
-  EditorPromptInput,
-  EditorParserOutput
->([buildEditorPrompt, editorModel as any, editorOutputParser]);
+  constructor(
+    message: string,
+    code: EditorChainError["code"],
+    cause?: unknown,
+  ) {
+    super(message);
+    this.name = "EditorChainError";
+    this.code = code;
+    this.cause = cause;
+  }
+}
+
+const DEFAULT_EDITOR_MODEL = "gpt-5";
+const DEFAULT_EDITOR_FALLBACK_MODEL = "gpt-4.1-mini";
+const DEFAULT_EDITOR_FALLBACK_MAX_TOKENS = 1000;
+const DEFAULT_EDITOR_TIMEOUT_MS = 45000;
+
+const parsePositiveIntEnv = (
+  value: string | undefined,
+  fallback: number,
+): number => {
+  const parsed = Number.parseInt(value ?? "", 10);
+  return Number.isInteger(parsed) && parsed > 0 ? parsed : fallback;
+};
+
+const toErrorMessage = (error: unknown): string =>
+  error instanceof Error ? error.message : String(error);
+
+const isRetryable = (error: unknown): boolean => {
+  const message = toErrorMessage(error).toLowerCase();
+  if (message.includes("credentials are required")) {
+    return false;
+  }
+
+  return (
+    message.includes("unsupported parameter") ||
+    message.includes("unsupported value") ||
+    message.includes("timed out") ||
+    message.includes("timeout") ||
+    message.includes("failed to parse") ||
+    message.includes("invalid json") ||
+    message.includes("output parser")
+  );
+};
 
 const stringifyCreativeVariables = (
   creativeVariables?: unknown,
@@ -64,7 +106,58 @@ export async function runEditorChain({
     storagePathHint: storagePathHint ?? "videos/rendered/video.mp4",
   };
 
-  const parsed = await editorRunnable.invoke(promptInput);
+  const primaryModel = process.env.EDITOR_MODEL ?? DEFAULT_EDITOR_MODEL;
+  const fallbackModel =
+    process.env.EDITOR_FALLBACK_MODEL ?? DEFAULT_EDITOR_FALLBACK_MODEL;
+  const timeoutMs = parsePositiveIntEnv(
+    process.env.EDITOR_TIMEOUT_MS,
+    DEFAULT_EDITOR_TIMEOUT_MS,
+  );
+  const fallbackMaxTokens = parsePositiveIntEnv(
+    process.env.EDITOR_FALLBACK_MAX_TOKENS,
+    DEFAULT_EDITOR_FALLBACK_MAX_TOKENS,
+  );
+
+  const invokeModel = async (model: string, maxTokens?: number) => {
+    const runnable = RunnableSequence.from<EditorPromptInput, EditorParserOutput>(
+      [
+        buildEditorPrompt,
+        createEditorModel({
+          model,
+          timeoutMs,
+          maxTokens,
+        }) as any,
+        editorOutputParser,
+      ],
+    );
+
+    return runnable.invoke(promptInput);
+  };
+
+  let parsed: EditorParserOutput;
+  try {
+    parsed = await invokeModel(primaryModel);
+  } catch (primaryError) {
+    if (!isRetryable(primaryError) || fallbackModel === primaryModel) {
+      throw new EditorChainError(
+        `Editor model invocation failed on ${primaryModel}: ${toErrorMessage(primaryError)}`,
+        "MODEL_INVOCATION",
+        primaryError,
+      );
+    }
+
+    try {
+      parsed = await invokeModel(fallbackModel, fallbackMaxTokens);
+    } catch (fallbackError) {
+      throw new EditorChainError(
+        `Editor attempts failed: primary model ${primaryModel} error: ${toErrorMessage(
+          primaryError,
+        )}; fallback model ${fallbackModel} error: ${toErrorMessage(fallbackError)}`,
+        "FALLBACK_FAILED",
+        fallbackError,
+      );
+    }
+  }
 
   return {
     storagePath: parsed.storagePath,

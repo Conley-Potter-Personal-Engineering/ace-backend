@@ -338,16 +338,12 @@ export const generateScriptFromApi = async (rawBody: unknown) => {
 };
 
 export const renderAssetFromApi = async (rawBody: unknown) => {
-  let context: WorkflowContext | null = null;
-  let scriptId: string | null = null;
-
   try {
     const parsedBody = EditorRenderRequestSchema.parse(rawBody ?? {});
-    context = {
+    const context: WorkflowContext = {
       workflow_id: parsedBody.workflow_id,
       correlation_id: parsedBody.correlation_id,
     };
-    scriptId = parsedBody.script_id;
 
     // Note: Validation of script/template existence is handled by EditorAgent v2.
     // The handler delegates all business logic to the agent.
@@ -357,6 +353,8 @@ export const renderAssetFromApi = async (rawBody: unknown) => {
     const agentInput: Record<string, unknown> = {
       scriptId: parsedBody.script_id,
       composition: parsedBody.composition,
+      workflowId: parsedBody.workflow_id ?? undefined,
+      correlationId: parsedBody.correlation_id ?? undefined,
     };
 
     if (parsedBody.style_template_id) {
@@ -366,13 +364,6 @@ export const renderAssetFromApi = async (rawBody: unknown) => {
     if (parsedBody.render_backend) {
       agentInput.renderBackend = parsedBody.render_backend;
     }
-
-    await logLifecycleEvent(
-      "EditorAgent",
-      "agent.run.start",
-      { script_id: parsedBody.script_id },
-      context,
-    );
 
     // Execute agent - this will emit agent.start, video.render.* events
     const result = (await new EditorAgent().execute(
@@ -395,27 +386,8 @@ export const renderAssetFromApi = async (rawBody: unknown) => {
       correlation_id: parsedBody.correlation_id ?? null,
     };
 
-    await logLifecycleEvent(
-      "EditorAgent",
-      "agent.run.success",
-      { script_id: response.script_id, asset_id: response.asset_id },
-      context,
-    );
-
     return response;
   } catch (error) {
-    if (context) {
-      await logLifecycleEvent(
-        "EditorAgent",
-        "agent.run.error",
-        {
-          script_id: scriptId,
-          message: error instanceof Error ? error.message : String(error),
-        },
-        context,
-      );
-    }
-
     if (error instanceof z.ZodError) {
       throw new AgentApiError("Invalid request data", 400, error.errors);
     }

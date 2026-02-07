@@ -66,7 +66,6 @@ export class EditorAgent extends BaseAgent {
 
   async run(rawInput: unknown): Promise<EditorAgentResult> {
     const baseContext = this.extractWorkflowContext(rawInput);
-    await this.logEvent("agent.start", { ...baseContext, input: rawInput });
     await this.logEvent("video.render.start", { ...baseContext, input: rawInput });
 
     try {
@@ -179,12 +178,6 @@ export class EditorAgent extends BaseAgent {
         durationSeconds: record.duration_seconds,
       });
 
-      await this.logEvent("agent.success", {
-        ...baseContext,
-        scriptId: input.scriptId,
-        assetId: record.asset_id,
-      });
-
       return {
         asset,
         metadata: validatedChain.metadata,
@@ -198,12 +191,7 @@ export class EditorAgent extends BaseAgent {
         message: normalizedError.message,
         code: normalizedError.code,
       });
-      await this.logEvent("agent.error", {
-        ...baseContext,
-        message: normalizedError.message,
-        code: normalizedError.code,
-      });
-      return this.handleError("EditorAgent.run", normalizedError);
+      throw normalizedError;
     }
   }
 
@@ -433,18 +421,50 @@ export class EditorAgent extends BaseAgent {
   private extractWorkflowContext(rawInput: unknown): {
     scriptId: string | null;
     styleTemplateId: string | null;
+    workflow_id: string | null;
+    correlation_id: string | null;
   } {
+    let workflowId: string | null = null;
+    let correlationId: string | null = null;
+    if (rawInput && typeof rawInput === "object" && !Array.isArray(rawInput)) {
+      const payload = rawInput as Record<string, unknown>;
+      if (typeof payload.workflowId === "string" && payload.workflowId.trim()) {
+        workflowId = payload.workflowId.trim();
+      } else if (
+        typeof payload.workflow_id === "string" &&
+        payload.workflow_id.trim()
+      ) {
+        workflowId = payload.workflow_id.trim();
+      }
+
+      if (
+        typeof payload.correlationId === "string" &&
+        payload.correlationId.trim()
+      ) {
+        correlationId = payload.correlationId.trim();
+      } else if (
+        typeof payload.correlation_id === "string" &&
+        payload.correlation_id.trim()
+      ) {
+        correlationId = payload.correlation_id.trim();
+      }
+    }
+
     const parsed = EditorRequestSchema.safeParse(rawInput);
     if (parsed.success) {
       return {
         scriptId: parsed.data.scriptId,
         styleTemplateId: parsed.data.styleTemplateId ?? null,
+        workflow_id: workflowId ?? parsed.data.workflowId ?? null,
+        correlation_id: correlationId ?? parsed.data.correlationId ?? null,
       };
     }
 
     return {
       scriptId: null,
       styleTemplateId: null,
+      workflow_id: workflowId,
+      correlation_id: correlationId,
     };
   }
 

@@ -126,7 +126,6 @@ describe("EditorAgent", () => {
     const loggedEvents = vi.mocked(logSystemEvent).mock.calls.map(
       ([payload]) => payload.event_type,
     );
-    expect(loggedEvents).toContain("agent.start");
     expect(loggedEvents).toContain("video.render.start");
     expect(loggedEvents).toContain("video.render.progress");
     expect(loggedEvents).toContain("video.assets.uploaded");
@@ -134,7 +133,8 @@ describe("EditorAgent", () => {
     expect(loggedEvents).toContain("video.assets.created");
     expect(loggedEvents).toContain("video.generate.start");
     expect(loggedEvents).toContain("video.generate.success");
-    expect(loggedEvents).toContain("agent.success");
+    expect(loggedEvents).not.toContain("agent.start");
+    expect(loggedEvents).not.toContain("agent.success");
 
     expect(result.storageUrl).toBe(mockStorageUrl);
     expect(result.asset.styleTags).toEqual(["cinematic"]);

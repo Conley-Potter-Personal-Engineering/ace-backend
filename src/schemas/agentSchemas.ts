@@ -28,6 +28,8 @@ export type ScriptOutputType = z.infer<typeof ScriptOutput>;
 export const EditorAgentInputSchema = z.object({
   scriptId: z.string().uuid("scriptId must be a valid UUID"),
   overrideStoragePath: z.string().trim().min(1).optional(),
+  workflowId: z.string().uuid("workflowId must be a valid UUID").optional(),
+  correlationId: z.string().uuid("correlationId must be a valid UUID").optional(),
 });
 
 export type EditorAgentInput = z.infer<typeof EditorAgentInputSchema>;
@@ -90,6 +92,8 @@ export const EditorRequestSchema = z.object({
   renderBackend: z
     .enum(["local", "s3", "supabase"])
     .default("supabase"),
+  workflowId: z.string().uuid("workflowId must be a valid UUID").optional(),
+  correlationId: z.string().uuid("correlationId must be a valid UUID").optional(),
 });
 
 export type EditorRequest = z.infer<typeof EditorRequestSchema>;
