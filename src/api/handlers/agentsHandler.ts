@@ -124,6 +124,24 @@ const attachContext = (
   correlation_id: context.correlation_id ?? null,
 });
 
+const inferLifecycleSeverity = (
+  eventType: string,
+): "debug" | "info" | "warning" | "error" | "critical" => {
+  if (eventType.includes("error")) {
+    return "error";
+  }
+  if (eventType.includes("warning")) {
+    return "warning";
+  }
+  return "info";
+};
+
+const inferLifecycleMessage = (eventType: string): string =>
+  eventType
+    .split(".")
+    .join(" ")
+    .replace(/\b\w/g, (char) => char.toUpperCase());
+
 const logLifecycleEvent = async (
   agentName: AgentName,
   eventType: string,
@@ -135,6 +153,13 @@ const logLifecycleEvent = async (
     event_type: eventType,
     workflow_id: context.workflow_id ?? null,
     correlation_id: context.correlation_id ?? null,
+    event_category: "agent",
+    severity: inferLifecycleSeverity(eventType),
+    message:
+      typeof payload.message === "string" && payload.message.trim()
+        ? payload.message
+        : inferLifecycleMessage(eventType),
+    metadata: { source: "agentsHandler" },
     payload: attachContext(payload, context),
     created_at: nowIso(),
   });
@@ -259,33 +284,13 @@ export const generateScriptFromApi = async (rawBody: unknown) => {
     getTrendSnapshotOrThrow(parsedBody.trend_snapshot_id, context),
   ]);
 
-  await logLifecycleEvent(
-    "ScriptwriterAgent",
-    "agent.run.start",
-    {
-      product_id: parsedBody.product_id,
-      creative_pattern_id: parsedBody.creative_pattern_id,
-      trend_snapshot_id: parsedBody.trend_snapshot_id,
-    },
-    context,
-  );
-
-  await logLifecycleEvent(
-    "ScriptwriterAgent",
-    "script.generate.start",
-    {
-      product_id: parsedBody.product_id,
-      creative_pattern_id: parsedBody.creative_pattern_id,
-      trend_snapshot_id: parsedBody.trend_snapshot_id,
-    },
-    context,
-  );
-
   try {
     const agentInput = ScriptwriterAgentInputSchema.parse({
       productId: parsedBody.product_id,
       creativePatternId: parsedBody.creative_pattern_id,
       trendSnapshotId: parsedBody.trend_snapshot_id,
+      workflowId: parsedBody.workflow_id ?? undefined,
+      correlationId: parsedBody.correlation_id ?? undefined,
     });
 
     const result = (await new ScriptwriterAgent().execute(agentInput)) as ScriptwriterResult;
@@ -299,19 +304,6 @@ export const generateScriptFromApi = async (rawBody: unknown) => {
       );
     }
 
-    await logLifecycleEvent(
-      "ScriptwriterAgent",
-      "script.generate.success",
-      { product_id: script.product_id, script_id: script.script_id },
-      context,
-    );
-    await logLifecycleEvent(
-      "ScriptwriterAgent",
-      "agent.run.success",
-      { product_id: script.product_id, script_id: script.script_id },
-      context,
-    );
-
     return {
       workflow_id: parsedBody.workflow_id ?? null,
       correlation_id: parsedBody.correlation_id ?? null,
@@ -324,29 +316,6 @@ export const generateScriptFromApi = async (rawBody: unknown) => {
       created_at: script.created_at ?? nowIso(),
     };
   } catch (error) {
-    await logLifecycleEvent(
-      "ScriptwriterAgent",
-      "script.generate.error",
-      {
-        product_id: parsedBody.product_id,
-        creative_pattern_id: parsedBody.creative_pattern_id,
-        trend_snapshot_id: parsedBody.trend_snapshot_id,
-        message: error instanceof Error ? error.message : String(error),
-      },
-      context,
-    );
-    await logLifecycleEvent(
-      "ScriptwriterAgent",
-      "agent.run.error",
-      {
-        product_id: parsedBody.product_id,
-        creative_pattern_id: parsedBody.creative_pattern_id,
-        trend_snapshot_id: parsedBody.trend_snapshot_id,
-        message: error instanceof Error ? error.message : String(error),
-      },
-      context,
-    );
-
     if (error instanceof AgentApiError) {
       throw error;
     }

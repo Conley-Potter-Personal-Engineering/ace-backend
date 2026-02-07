@@ -7,7 +7,7 @@ const agentNoteInsertSchema = z.object({
   content: z.string().min(1, "Note content is required"),
   created_at: nullableDateSchema,
   embedding: z.string().nullable().optional(),
-  importance: z.number().nullable().optional(), // This should be a number between 1 and 5
+  importance: z.number().int().min(1).max(5).nullable().optional(),
   note_id: identifierSchema.optional(),
   topic: z.string().trim().nullable().optional(),
 });
@@ -141,8 +141,13 @@ export const searchNotesByTopic = async (topicFragment: string) => {
   return data ?? [];
 };
 
-export const listImportantNotes = async (minimumImportance = 0.8) => {
-  const validatedThreshold = z.number().min(0).max(1).parse(minimumImportance);
+export const listImportantNotes = async (minimumImportance = 4) => {
+  const validatedThreshold = z
+    .number()
+    .int()
+    .min(1)
+    .max(5)
+    .parse(minimumImportance);
   const { data, error } = await getSupabase()
     .from("agent_notes")
     .select("*")

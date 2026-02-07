@@ -319,10 +319,8 @@ describeIf("ScriptwriterAgent integration", () => {
       )
       .map((event) => event.event_type);
     expect(eventTypes).toEqual([
-      "agent.start",
       "script.generate.start",
       "script.generate.success",
-      "agent.success",
     ]);
 
     expect(result.script.product_id).toBe(productId);
@@ -404,11 +402,8 @@ describeIf("ScriptwriterAgent integration", () => {
       )
       .map((event) => event.event_type);
     expect(eventTypes).toEqual([
-      "agent.start",
       "script.generate.start",
       "script.generate.error",
-      "agent.error",
-      "error",
     ]);
   });
 });

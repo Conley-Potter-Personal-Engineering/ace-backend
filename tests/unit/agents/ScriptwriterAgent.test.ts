@@ -67,13 +67,6 @@ describe("ScriptwriterAgent", () => {
   } as const;
 
   const expectedScriptText = [
-    structuredScript.title,
-    "",
-    `Hook: ${structuredScript.hook}`,
-    "",
-    "Outline:",
-    "1. Setup\n2. Payoff",
-    "",
     structuredScript.body,
     "",
     `CTA: ${structuredScript.cta}`,
@@ -182,14 +175,13 @@ describe("ScriptwriterAgent", () => {
       expect.objectContaining({
         agent_name: "ScriptwriterAgentTest",
         topic: "script_generation",
+        importance: 3,
       }),
     );
 
     expect(eventCalls.map(({ eventType }) => eventType)).toEqual([
-      "agent.start",
       "script.generate.start",
       "script.generate.success",
-      "agent.success",
     ]);
 
     expect(result).toEqual({
@@ -209,11 +201,8 @@ describe("ScriptwriterAgent", () => {
 
     const emitted = eventCalls.map(({ eventType }) => eventType);
     expect(emitted).toEqual([
-      "agent.start",
       "script.generate.start",
       "script.generate.error",
-      "agent.error",
-      "error",
     ]);
   });
 
@@ -230,11 +219,8 @@ describe("ScriptwriterAgent", () => {
 
     const emitted = eventCalls.map(({ eventType }) => eventType);
     expect(emitted).toEqual([
-      "agent.start",
       "script.generate.start",
       "script.generate.error",
-      "agent.error",
-      "error",
     ]);
   });
 });

@@ -65,22 +65,9 @@ interface WorkflowContext {
 }
 
 const formatScriptText = (output: ScriptOutputType): string => {
-  const outline = output.outline.length
-    ? output.outline.map((beat, index) => `${index + 1}. ${beat}`).join("\n")
-    : "No outline provided.";
-
-  return [
-    output.title,
-    "",
-    `Hook: ${output.hook}`,
-    "",
-    "Outline:",
-    outline,
-    "",
-    output.body,
-    "",
-    `CTA: ${output.cta}`,
-  ].join("\n");
+  const body = output.body.trim();
+  const cta = output.cta.trim();
+  return [body, `CTA: ${cta}`].filter(Boolean).join("\n\n");
 };
 
 const pickFirst = (values: string[] | null | undefined, fallback: string): string =>
@@ -107,7 +94,6 @@ export class ScriptwriterAgent extends BaseAgent {
 
   async run(rawInput: unknown): Promise<ScriptwriterResult> {
     const baseContext = this.extractWorkflowContext(rawInput);
-    await this.logEvent("agent.start", { ...baseContext, input: rawInput });
     await this.logEvent("script.generate.start", { ...baseContext, input: rawInput });
 
     try {
@@ -120,10 +106,6 @@ export class ScriptwriterAgent extends BaseAgent {
         ...successContext,
         scriptId: execution.result.scriptId,
       });
-      await this.logEvent("agent.success", {
-        ...successContext,
-        scriptId: execution.result.scriptId,
-      });
 
       return execution.result;
     } catch (error) {
@@ -133,21 +115,42 @@ export class ScriptwriterAgent extends BaseAgent {
         message: normalizedError.message,
         code: normalizedError.code,
       });
-      await this.logEvent("agent.error", {
-        ...baseContext,
-        message: normalizedError.message,
-        code: normalizedError.code,
-      });
-      return this.handleError("ScriptwriterAgent.run", normalizedError);
+      throw normalizedError;
     }
   }
 
   private extractWorkflowContext(rawInput: unknown): WorkflowContext {
+    let workflowId: string | null = null;
+    let correlationId: string | null = null;
+    if (rawInput && typeof rawInput === "object" && !Array.isArray(rawInput)) {
+      const payload = rawInput as Record<string, unknown>;
+      if (typeof payload.workflowId === "string" && payload.workflowId.trim()) {
+        workflowId = payload.workflowId.trim();
+      } else if (
+        typeof payload.workflow_id === "string" &&
+        payload.workflow_id.trim()
+      ) {
+        workflowId = payload.workflow_id.trim();
+      }
+
+      if (
+        typeof payload.correlationId === "string" &&
+        payload.correlationId.trim()
+      ) {
+        correlationId = payload.correlationId.trim();
+      } else if (
+        typeof payload.correlation_id === "string" &&
+        payload.correlation_id.trim()
+      ) {
+        correlationId = payload.correlation_id.trim();
+      }
+    }
+
     const summaryParse = ScriptWriterInput.safeParse(rawInput);
     if (summaryParse.success) {
       return {
-        workflow_id: null,
-        correlation_id: null,
+        workflow_id: workflowId ?? summaryParse.data.workflowId ?? null,
+        correlation_id: correlationId ?? summaryParse.data.correlationId ?? null,
         productId: summaryParse.data.productId,
         patternId: summaryParse.data.creativePatternId,
         trendSnapshotId: summaryParse.data.trendSnapshotId,
@@ -155,8 +158,8 @@ export class ScriptwriterAgent extends BaseAgent {
     }
 
     return {
-      workflow_id: null,
-      correlation_id: null,
+      workflow_id: workflowId,
+      correlation_id: correlationId,
       productId: null,
       patternId: null,
       trendSnapshotId: null,
@@ -235,7 +238,7 @@ export class ScriptwriterAgent extends BaseAgent {
           `Creative variables: ${JSON.stringify(creativeVariables)}`,
           `CTA: ${structuredScript.cta}`,
         ].join("\n"),
-        importance: 0.6,
+        importance: 3,
         embedding: null,
         created_at: this.now(),
       });
@@ -249,8 +252,8 @@ export class ScriptwriterAgent extends BaseAgent {
     return {
       result: createdScript,
       context: {
-        workflow_id: null,
-        correlation_id: null,
+        workflow_id: input.workflowId ?? null,
+        correlation_id: input.correlationId ?? null,
         productId: input.productId,
         patternId: patternUsed?.pattern_id ?? null,
         trendSnapshotId: trendReference?.snapshot_id ?? null,

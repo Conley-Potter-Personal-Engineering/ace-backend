@@ -5,6 +5,8 @@ export const ScriptwriterAgentInputSchema = z.object({
   productId: z.string().uuid("productId must be a valid UUID"),
   creativePatternId: z.string().uuid("creativePatternId must be a valid UUID"),
   trendSnapshotId: z.string().uuid("trendSnapshotId must be a valid UUID"),
+  workflowId: z.string().uuid("workflowId must be a valid UUID").optional(),
+  correlationId: z.string().uuid("correlationId must be a valid UUID").optional(),
 });
 
 export type ScriptwriterAgentInput = z.infer<typeof ScriptwriterAgentInputSchema>;
